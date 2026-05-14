@@ -10,6 +10,18 @@ cp .env.example .env
 npm run dev
 ```
 
+## Banco de Dados
+
+O backend usa PostgreSQL com Prisma. Para preparar o banco:
+
+```bash
+npm run db:generate
+npm run db:push
+npm run db:seed
+```
+
+Veja detalhes em `docs/DATABASE.md`.
+
 ## Estrutura
 
 - `src/modules`: regras de negócio por domínio do produto.
