@@ -17,6 +17,7 @@ import { registerSettingsRoutes } from "./modules/settings/settings.routes.js";
 import { registerReportsRoutes } from "./modules/reports/reports.routes.js";
 import { registerCommercialRoutes } from "./modules/commercial/commercial.routes.js";
 import { registerUploadsRoutes } from "./modules/media/uploads.routes.js";
+import { registerAIRoutes } from "./modules/ai/ai.routes.js";
 
 export function buildApp() {
   const app = Fastify({ logger: env.NODE_ENV !== "test" });
@@ -43,6 +44,7 @@ export function buildApp() {
     api.register(registerSettingsRoutes, { prefix: "/settings" });
     api.register(registerReportsRoutes, { prefix: "/reports" });
     api.register(registerCommercialRoutes, { prefix: "/commercial" });
+    api.register(registerAIRoutes, { prefix: "/ai" });
   }, { prefix: "/api" });
 
   return app;
