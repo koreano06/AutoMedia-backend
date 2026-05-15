@@ -5,5 +5,15 @@ const ready = app.ready();
 
 export default async function handler(request: any, response: any) {
   await ready;
+
+  const catchAllPath = request.query?.path;
+  if (catchAllPath) {
+    const segments = Array.isArray(catchAllPath) ? catchAllPath : [catchAllPath];
+    const originalUrl = new URL(request.url, "http://localhost");
+    originalUrl.searchParams.delete("path");
+    const queryString = originalUrl.searchParams.toString();
+    request.url = `/api/${segments.map((segment) => encodeURIComponent(String(segment))).join("/")}${queryString ? `?${queryString}` : ""}`;
+  }
+
   app.server.emit("request", request, response);
 }
