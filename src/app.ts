@@ -19,6 +19,8 @@ import { registerCommercialRoutes } from "./modules/commercial/commercial.routes
 import { registerUploadsRoutes } from "./modules/media/uploads.routes.js";
 import { registerAIRoutes } from "./modules/ai/ai.routes.js";
 import { registerMetaRoutes } from "./modules/meta/meta.routes.js";
+import { platformsService } from "./modules/platforms/platforms.service.js";
+import { postsService } from "./modules/posts/posts.service.js";
 
 export function buildApp() {
   const app = Fastify({ logger: env.NODE_ENV !== "test" });
@@ -30,6 +32,31 @@ export function buildApp() {
 
   app.register(async (api) => {
     api.get("/health", async () => ({ status: "ok", service: "automedia-api" }));
+    api.get("/platform-accounts", async () => platformsService.listAccounts());
+    api.post("/platform-connect", async (request) => {
+      const { platform } = request.body as { platform: string };
+      return platformsService.connect(platform);
+    });
+    api.post("/platform-disconnect", async (request) => {
+      const { platform } = request.body as { platform: string };
+      return platformsService.disconnect(platform);
+    });
+    api.post("/platform-publish", async (request) => {
+      const { platform, ...payload } = request.body as { platform: string; [key: string]: unknown };
+      return platformsService.publish(platform, {
+        post_id: payload.post_id as string | undefined,
+        media_asset_id: payload.media_asset_id as string | undefined,
+        product_name: payload.product_name as string | undefined,
+        caption: String(payload.caption || ""),
+        media_url: payload.media_url as string | undefined,
+        thumbnail_url: payload.thumbnail_url as string | undefined,
+        scheduled_at: payload.scheduled_at as string | undefined,
+      });
+    });
+    api.post("/post-publish-now", async (request) => {
+      const { id } = request.body as { id: string };
+      return postsService.publishNow(id);
+    });
     api.register(registerMetaRoutes, { prefix: "/meta" });
     api.register(registerAuthRoutes, { prefix: "/auth" });
     api.register(registerUsersRoutes, { prefix: "/users" });
