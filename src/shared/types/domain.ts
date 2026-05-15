@@ -148,6 +148,11 @@ export type PlatformAccount = {
   expires_at?: ISODateString;
   last_sync_at?: ISODateString;
   error_message?: string;
+  access_token?: string;
+  refresh_token?: string;
+  token_type?: string;
+  provider_user_id?: string;
+  metadata?: Record<string, string | number | boolean>;
 };
 
 export type AutomationSettings = {
