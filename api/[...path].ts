@@ -8,7 +8,8 @@ export default async function handler(request: any, response: any) {
 
   const catchAllPath = request.query?.path;
   if (catchAllPath) {
-    const segments = Array.isArray(catchAllPath) ? catchAllPath : [catchAllPath];
+    const rawSegments = Array.isArray(catchAllPath) ? catchAllPath : [catchAllPath];
+    const segments = rawSegments.flatMap((segment) => String(segment).split("/")).filter(Boolean);
     const originalUrl = new URL(request.url, "http://localhost");
     originalUrl.searchParams.delete("path");
     const queryString = originalUrl.searchParams.toString();
