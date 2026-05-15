@@ -7,7 +7,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().default("postgresql://user:password@localhost:5432/automedia"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
   JWT_SECRET: z.string().min(16).default("change-me-in-production"),
-  CORS_ORIGIN: z.string().default("http://localhost:5173,http://localhost:4173"),
+  CORS_ORIGIN: z.string().default("https://auto-media-sooty.vercel.app,http://localhost:5173,http://localhost:4173"),
   STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
   UPLOADS_DIR: z.string().default("uploads"),
 });

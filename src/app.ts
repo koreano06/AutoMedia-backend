@@ -18,6 +18,7 @@ import { registerReportsRoutes } from "./modules/reports/reports.routes.js";
 import { registerCommercialRoutes } from "./modules/commercial/commercial.routes.js";
 import { registerUploadsRoutes } from "./modules/media/uploads.routes.js";
 import { registerAIRoutes } from "./modules/ai/ai.routes.js";
+import { registerMetaRoutes } from "./modules/meta/meta.routes.js";
 
 export function buildApp() {
   const app = Fastify({ logger: env.NODE_ENV !== "test" });
@@ -29,6 +30,7 @@ export function buildApp() {
 
   app.register(async (api) => {
     api.get("/health", async () => ({ status: "ok", service: "automedia-api" }));
+    api.register(registerMetaRoutes, { prefix: "/meta" });
     api.register(registerAuthRoutes, { prefix: "/auth" });
     api.register(registerUsersRoutes, { prefix: "/users" });
     api.register(registerProductsRoutes, { prefix: "/products" });
