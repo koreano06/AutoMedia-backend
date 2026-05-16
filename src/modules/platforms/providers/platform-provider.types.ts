@@ -15,8 +15,10 @@ export type PublishPayload = {
   post_id?: string;
   media_asset_id?: string;
   product_name?: string;
+  title?: string;
   caption: string;
   media_url?: string;
+  mime_type?: string;
   thumbnail_url?: string;
   scheduled_at?: string;
 };

@@ -58,6 +58,7 @@ export const postsService = {
       post_id: post.id,
       media_asset_id: post.media_asset_id,
       product_name: post.product_name,
+      title: post.product_name,
       caption: post.caption || "",
       media_url: post.thumbnail_url,
     });

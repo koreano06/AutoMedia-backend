@@ -15,22 +15,42 @@ function expiresAt(expiresIn?: number) {
   return new Date(Date.now() + expiresIn * 1000).toISOString();
 }
 
+function setupHint(platform: string, configured: boolean) {
+  if (env.SOCIAL_INTEGRATIONS_MODE === "mock") return "Modo teste ativo. Use live para OAuth real.";
+  if (configured) return "Credenciais configuradas. Pronto para autorizar OAuth.";
+
+  const keys: Record<string, string> = {
+    instagram: "META_CLIENT_ID e META_CLIENT_SECRET",
+    facebook: "META_CLIENT_ID e META_CLIENT_SECRET",
+    tiktok: "TIKTOK_CLIENT_KEY e TIKTOK_CLIENT_SECRET",
+    youtube: "GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET",
+    shopee: "SHOPEE_PARTNER_ID e SHOPEE_PARTNER_KEY",
+    mercadolivre: "MERCADOLIVRE_CLIENT_ID e MERCADOLIVRE_CLIENT_SECRET",
+  };
+
+  return `Configure ${keys[platform] || "as credenciais oficiais"} no backend.`;
+}
+
 export const platformsService = {
-  listAccounts() {
+  async listAccounts() {
     const providers = listPlatformProviders();
-    return platformsRepository.listAccounts().map((account) => {
+    const accounts = await platformsRepository.listAccounts();
+    return accounts.map((account) => {
       const provider = providers.find((item) => item.platform === account.platform);
+      const configured = provider?.isConfigured() || env.SOCIAL_INTEGRATIONS_MODE === "mock";
       return {
         ...account,
-        configured: provider?.isConfigured() || env.SOCIAL_INTEGRATIONS_MODE === "mock",
+        configured,
         mode: env.SOCIAL_INTEGRATIONS_MODE,
         required_scopes: provider?.requiredScopes || [],
+        setup_status: env.SOCIAL_INTEGRATIONS_MODE === "mock" ? "mock" : configured ? "ready" : "missing_credentials",
+        setup_hint: setupHint(account.platform, Boolean(configured)),
       };
     });
   },
 
-  connect(platform: string) {
-    const account = platformsRepository.findByPlatform(platform);
+  async connect(platform: string) {
+    const account = await platformsRepository.findByPlatform(platform);
     const provider = getPlatformProvider(platform);
     if (!account || !provider) throw new AppError("Plataforma não suportada", 404, "PLATFORM_NOT_FOUND");
 
@@ -42,7 +62,7 @@ export const platformsService = {
         expires_in: 60 * 60 * 24 * 30,
         scopes: provider.requiredScopes,
       };
-      const connected = platformsRepository.updateAccount(platform, {
+      const connected = await platformsRepository.updateAccount(platform, {
         status: "connected",
         access_token: token.access_token,
         refresh_token: token.refresh_token,
@@ -55,7 +75,7 @@ export const platformsService = {
 
       return {
         account: connected,
-        oauth_url: `${env.FRONTEND_URL}/settings?platform=${platform}&connected=1`,
+        oauth_url: `${env.FRONTEND_URL}/integrations?platform=${platform}&connected=1`,
         mode: "mock",
       };
     }
@@ -69,14 +89,14 @@ export const platformsService = {
     };
   },
 
-  getConnectUrl(platform: string) {
+  async getConnectUrl(platform: string) {
     return this.connect(platform);
   },
 
   async handleCallback(platform: string, query: { code?: string; error?: string; error_description?: string; shop_id?: string }) {
     if (query.error) {
-      platformsRepository.updateAccount(platform, { status: "error", error_message: query.error_description || query.error });
-      return { redirect_url: `${env.FRONTEND_URL}/settings?platform=${platform}&error=${encodeURIComponent(query.error)}` };
+      await platformsRepository.updateAccount(platform, { status: "error", error_message: query.error_description || query.error });
+      return { redirect_url: `${env.FRONTEND_URL}/integrations?platform=${platform}&error=${encodeURIComponent(query.error)}` };
     }
 
     if (!query.code) throw new AppError("Código OAuth ausente", 400, "OAUTH_CODE_MISSING");
@@ -86,7 +106,7 @@ export const platformsService = {
     if (env.SOCIAL_INTEGRATIONS_MODE === "live") ensureConfigured(provider);
 
     const token = await provider.exchangeCode(query.code, { shop_id: query.shop_id });
-    const account = platformsRepository.updateAccount(platform, {
+    const account = await platformsRepository.updateAccount(platform, {
       status: "connected",
       access_token: token.access_token,
       refresh_token: token.refresh_token,
@@ -100,11 +120,11 @@ export const platformsService = {
       metadata: { connected_at: nowIso(), mode: env.SOCIAL_INTEGRATIONS_MODE },
     });
 
-    return { account, redirect_url: `${env.FRONTEND_URL}/settings?platform=${platform}&connected=1` };
+    return { account, redirect_url: `${env.FRONTEND_URL}/integrations?platform=${platform}&connected=1` };
   },
 
-  disconnect(platform: string) {
-    const account = platformsRepository.updateAccount(platform, {
+  async disconnect(platform: string) {
+    const account = await platformsRepository.updateAccount(platform, {
       status: "disconnected",
       access_token: undefined,
       refresh_token: undefined,
@@ -118,7 +138,7 @@ export const platformsService = {
   },
 
   async publish(platform: string, payload: PublishPayload) {
-    const account = platformsRepository.findByPlatform(platform);
+    const account = await platformsRepository.findByPlatform(platform);
     const provider = getPlatformProvider(platform);
     if (!account || !provider) throw new AppError("Plataforma não suportada", 404, "PLATFORM_NOT_FOUND");
     if (account.status !== "connected" || !account.access_token) throw new AppError("Plataforma não conectada", 409, "PLATFORM_NOT_CONNECTED");

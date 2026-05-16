@@ -26,6 +26,7 @@ import { mediaService } from "./modules/media/media.service.js";
 import { videosService } from "./modules/videos/videos.service.js";
 import { commentsService } from "./modules/comments/comments.service.js";
 import { mediaRepository } from "./modules/media/media.repository.js";
+import { oauthCallbackQuerySchema } from "./modules/platforms/platforms.schemas.js";
 
 export function buildApp() {
   const app = Fastify({ logger: env.NODE_ENV !== "test" });
@@ -38,6 +39,11 @@ export function buildApp() {
   app.register(async (api) => {
     api.get("/health", async () => ({ status: "ok", service: "automedia-api" }));
     api.get("/platform-accounts", async () => platformsService.listAccounts());
+    api.get("/platform-callback", async (request, reply) => {
+      const { platform, ...query } = oauthCallbackQuerySchema.parse(request.query);
+      const result = await platformsService.handleCallback(platform, query);
+      return reply.redirect(result.redirect_url);
+    });
     api.post("/product-analyze", async (request) => {
       return productsService.analyze(request.body as { product_id?: string; source_url?: string; image_asset_id?: string });
     });
@@ -107,8 +113,10 @@ export function buildApp() {
         post_id: payload.post_id as string | undefined,
         media_asset_id: payload.media_asset_id as string | undefined,
         product_name: payload.product_name as string | undefined,
+        title: payload.title as string | undefined,
         caption: String(payload.caption || ""),
         media_url: payload.media_url as string | undefined,
+        mime_type: payload.mime_type as string | undefined,
         thumbnail_url: payload.thumbnail_url as string | undefined,
         scheduled_at: payload.scheduled_at as string | undefined,
       });

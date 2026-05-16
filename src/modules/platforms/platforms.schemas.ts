@@ -10,6 +10,10 @@ export const oauthCallbackSchema = z.object({
   shop_id: z.string().optional(),
 });
 
+export const oauthCallbackQuerySchema = oauthCallbackSchema.extend({
+  platform: z.string().min(1),
+});
+
 export const publishPayloadSchema = z.object({
   post_id: z.string().optional(),
   media_asset_id: z.string().optional(),

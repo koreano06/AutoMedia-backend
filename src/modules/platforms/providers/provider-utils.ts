@@ -15,7 +15,7 @@ export function buildUrl(baseUrl: string, params: Record<string, string | number
 }
 
 export function redirectUri(platform: string) {
-  return `${env.API_PUBLIC_URL}/api/platforms/${platform}/callback`;
+  return `${env.API_PUBLIC_URL}/api/platform-callback?platform=${platform}`;
 }
 
 export function ensureConfigured(provider: PlatformProvider) {
@@ -57,6 +57,80 @@ export async function postForm<T>(url: string, body: Record<string, string | und
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new AppError(`Falha OAuth: ${JSON.stringify(payload)}`, response.status, "OAUTH_EXCHANGE_FAILED");
+  }
+
+  return payload as T;
+}
+
+export function getBearerToken(account: { access_token?: string; platform?: string }) {
+  if (!account.access_token) {
+    throw new AppError(`Conta ${account.platform || ""} sem token de acesso`, 409, "PLATFORM_TOKEN_MISSING");
+  }
+
+  return account.access_token;
+}
+
+export function requirePublicMediaUrl(payload: PublishPayload, platform: string) {
+  if (!payload.media_url || !/^https:\/\//i.test(payload.media_url)) {
+    throw new AppError(
+      `${platform} exige uma URL publica HTTPS da midia para publicar pela API oficial`,
+      422,
+      "PUBLIC_MEDIA_URL_REQUIRED",
+    );
+  }
+
+  return payload.media_url;
+}
+
+export function captionFor(payload: PublishPayload, maxLength = 2200) {
+  return (payload.caption || payload.product_name || "Novo conteudo").slice(0, maxLength);
+}
+
+export async function getJson<T>(url: string, accessToken?: string) {
+  const response = await fetch(url, {
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new AppError(`Falha na API externa: ${JSON.stringify(payload)}`, response.status, "EXTERNAL_API_ERROR");
+  }
+
+  return payload as T;
+}
+
+export async function postJson<T>(url: string, body: unknown, accessToken?: string) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json; charset=UTF-8",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new AppError(`Falha na API externa: ${JSON.stringify(payload)}`, response.status, "EXTERNAL_API_ERROR");
+  }
+
+  return payload as T;
+}
+
+export async function postGraphForm<T>(url: string, body: Record<string, string | number | boolean | undefined>) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(
+      Object.entries(body)
+        .filter((entry): entry is [string, string | number | boolean] => entry[1] !== undefined)
+        .map(([key, value]) => [key, String(value)]),
+    ),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new AppError(`Falha na API externa: ${JSON.stringify(payload)}`, response.status, "EXTERNAL_API_ERROR");
   }
 
   return payload as T;

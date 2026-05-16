@@ -1,7 +1,7 @@
 import { env } from "../../../config/env.js";
 import type { PlatformAccount } from "../../../shared/types/domain.js";
 import type { OAuthTokenResult, PlatformProvider, PublishPayload, PublishResult } from "./platform-provider.types.js";
-import { buildMockPublish, buildMockToken, buildUrl, postForm, redirectUri } from "./provider-utils.js";
+import { buildMockPublish, buildMockToken, buildUrl, captionFor, getBearerToken, postForm, postJson, redirectUri, requirePublicMediaUrl } from "./provider-utils.js";
 
 type TikTokTokenResponse = {
   access_token: string;
@@ -10,6 +10,17 @@ type TikTokTokenResponse = {
   expires_in?: number;
   scope?: string;
   open_id?: string;
+};
+
+type TikTokPublishResponse = {
+  data?: {
+    publish_id?: string;
+  };
+  error?: {
+    code?: string;
+    message?: string;
+    log_id?: string;
+  };
 };
 
 const scopes = ["user.info.basic", "video.publish", "video.upload"];
@@ -50,7 +61,42 @@ export const tiktokProvider: PlatformProvider = {
       account_name: "TikTok conectado",
     };
   },
-  async publish(_account: PlatformAccount, payload: PublishPayload): Promise<PublishResult> {
-    return buildMockPublish("tiktok", payload);
+  async publish(account: PlatformAccount, payload: PublishPayload): Promise<PublishResult> {
+    if (env.SOCIAL_INTEGRATIONS_MODE === "mock") return buildMockPublish("tiktok", payload);
+
+    const mediaUrl = requirePublicMediaUrl(payload, "TikTok");
+    const token = getBearerToken(account);
+    const response = await postJson<TikTokPublishResponse>("https://open.tiktokapis.com/v2/post/publish/video/init/", {
+      post_info: {
+        title: captionFor(payload, 2200),
+        privacy_level: "SELF_ONLY",
+        disable_duet: false,
+        disable_comment: false,
+        disable_stitch: false,
+        brand_content_toggle: false,
+        brand_organic_toggle: true,
+        is_aigc: true,
+      },
+      source_info: {
+        source: "PULL_FROM_URL",
+        video_url: mediaUrl,
+      },
+    }, token);
+
+    if (response.error?.code && response.error.code !== "ok") {
+      return {
+        external_post_id: response.data?.publish_id || `tiktok_failed_${Date.now()}`,
+        status: "failed",
+        message: response.error.message || response.error.code,
+        raw: response,
+      };
+    }
+
+    return {
+      external_post_id: response.data?.publish_id || `tiktok_${Date.now()}`,
+      status: "publishing",
+      message: "Envio iniciado no TikTok Content Posting API.",
+      raw: response,
+    };
   },
 };

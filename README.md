@@ -22,6 +22,10 @@ npm run db:seed
 
 Veja detalhes em `docs/DATABASE.md`.
 
+## Integrações sociais
+
+O projeto agora separa `mock` e `live` para redes sociais. Veja o passo a passo em `docs/SOCIAL_INTEGRATIONS.md`.
+
 ## Estrutura
 
 - `src/modules`: regras de negócio por domínio do produto.

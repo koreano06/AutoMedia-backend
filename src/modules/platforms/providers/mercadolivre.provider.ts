@@ -1,4 +1,5 @@
 import { env } from "../../../config/env.js";
+import { AppError } from "../../../shared/errors/AppError.js";
 import type { PlatformAccount } from "../../../shared/types/domain.js";
 import type { OAuthTokenResult, PlatformProvider, PublishPayload, PublishResult } from "./platform-provider.types.js";
 import { buildMockPublish, buildMockToken, buildUrl, postForm, redirectUri } from "./provider-utils.js";
@@ -49,6 +50,14 @@ export const mercadoLivreProvider: PlatformProvider = {
     };
   },
   async publish(_account: PlatformAccount, payload: PublishPayload): Promise<PublishResult> {
+    if (env.SOCIAL_INTEGRATIONS_MODE === "live") {
+      throw new AppError(
+        "Mercado Livre exige publicacao como anuncio/produto. O fluxo de post social nao se aplica a esta plataforma.",
+        422,
+        "MARKETPLACE_LISTING_REQUIRED",
+      );
+    }
+
     return buildMockPublish("mercadolivre", payload);
   },
 };

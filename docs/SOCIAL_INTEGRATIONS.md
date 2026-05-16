@@ -1,32 +1,53 @@
 # Integrações com redes sociais
 
-Este backend está preparado para dois modos:
+O backend suporta dois modos:
 
-- `SOCIAL_INTEGRATIONS_MODE=mock`: conecta e publica de forma simulada para testar o fluxo completo.
-- `SOCIAL_INTEGRATIONS_MODE=live`: usa OAuth real e exige credenciais oficiais das plataformas.
+- `SOCIAL_INTEGRATIONS_MODE=mock`: simula OAuth/publicação para validar o fluxo.
+- `SOCIAL_INTEGRATIONS_MODE=live`: usa OAuth real, salva tokens em `platform_accounts` e chama APIs oficiais quando a plataforma permite.
 
-## Fluxo implementado
+## Fluxo profissional
 
-1. Frontend chama `POST /api/platforms/:platform/connect`.
-2. Backend retorna `oauth_url` ou conecta direto em modo `mock`.
-3. Em modo `live`, a plataforma redireciona para `GET /api/platforms/:platform/callback`.
-4. Backend troca `code` por token e marca a conta como conectada.
-5. Publicações usam `POST /api/posts/:id/publish-now`, que chama o provider da plataforma.
+1. O frontend chama `POST /api/platform-connect` com `{ "platform": "instagram" }`.
+2. Em `mock`, o backend marca a conta como conectada para testes.
+3. Em `live`, o backend retorna `oauth_url` e o usuário autoriza no provedor oficial.
+4. O provedor redireciona para `GET /api/platform-callback?platform=...&code=...`.
+5. O backend troca `code` por token, salva a conta em `platform_accounts` e volta para `/integrations`.
+6. Publicações usam `POST /api/post-publish-now` ou `POST /api/platform-publish`.
 
-## Variáveis principais
+## Redirect URIs
+
+Cadastre estes redirects nos portais de desenvolvedor:
 
 ```env
-FRONTEND_URL="https://auto-media-sooty.vercel.app"
-API_PUBLIC_URL="https://auto-media-backend.vercel.app"
-SOCIAL_INTEGRATIONS_MODE="mock"
+META_REDIRECT_URI="https://auto-media-backend.vercel.app/api/platform-callback?platform=instagram"
+TIKTOK_REDIRECT_URI="https://auto-media-backend.vercel.app/api/platform-callback?platform=tiktok"
+YOUTUBE_REDIRECT_URI="https://auto-media-backend.vercel.app/api/platform-callback?platform=youtube"
+MERCADOLIVRE_REDIRECT_URI="https://auto-media-backend.vercel.app/api/platform-callback?platform=mercadolivre"
+SHOPEE_REDIRECT_URI="https://auto-media-backend.vercel.app/api/platform-callback?platform=shopee"
 ```
 
-Meta Instagram/Facebook:
+## Publicação implementada
+
+- Instagram: cria container de mídia e publica via Graph API. Exige conta profissional e mídia em URL HTTPS pública.
+- Facebook: publica texto ou foto em uma Page via Graph API.
+- TikTok: inicia Direct Post via Content Posting API usando `PULL_FROM_URL`. O domínio da mídia precisa estar verificado no TikTok.
+- YouTube: faz upload resumível via YouTube Data API para vídeos pequenos. Para produção com vídeos grandes, mova o upload para worker/fila dedicada.
+- Mercado Livre/Shopee: em `live`, retornam erro orientativo porque marketplace exige fluxo de anúncio/catálogo, não post social.
+
+## Variáveis
+
+```env
+SOCIAL_INTEGRATIONS_MODE="live"
+FRONTEND_URL="https://auto-media-sooty.vercel.app"
+API_PUBLIC_URL="https://auto-media-backend.vercel.app"
+DATABASE_URL="postgresql://..."
+```
+
+Meta:
 
 ```env
 META_CLIENT_ID=""
 META_CLIENT_SECRET=""
-META_REDIRECT_URI="https://auto-media-backend.vercel.app/api/platforms/instagram/callback"
 META_GRAPH_VERSION="v21.0"
 ```
 
@@ -35,7 +56,6 @@ TikTok:
 ```env
 TIKTOK_CLIENT_KEY=""
 TIKTOK_CLIENT_SECRET=""
-TIKTOK_REDIRECT_URI="https://auto-media-backend.vercel.app/api/platforms/tiktok/callback"
 ```
 
 YouTube:
@@ -43,7 +63,6 @@ YouTube:
 ```env
 GOOGLE_CLIENT_ID=""
 GOOGLE_CLIENT_SECRET=""
-YOUTUBE_REDIRECT_URI="https://auto-media-backend.vercel.app/api/platforms/youtube/callback"
 ```
 
 Mercado Livre e Shopee:
@@ -51,16 +70,13 @@ Mercado Livre e Shopee:
 ```env
 MERCADOLIVRE_CLIENT_ID=""
 MERCADOLIVRE_CLIENT_SECRET=""
-MERCADOLIVRE_REDIRECT_URI="https://auto-media-backend.vercel.app/api/platforms/mercadolivre/callback"
-
 SHOPEE_PARTNER_ID=""
 SHOPEE_PARTNER_KEY=""
-SHOPEE_REDIRECT_URI="https://auto-media-backend.vercel.app/api/platforms/shopee/callback"
 ```
 
-## Observações importantes
+## Pendências fora do código
 
-- YouTube usa OAuth 2.0 e o escopo `https://www.googleapis.com/auth/youtube.upload`.
-- TikTok Content Posting API usa escopos como `video.publish` e clientes não auditados podem ter visibilidade limitada.
-- Instagram/Facebook exigem app no Meta Developers, permissões de páginas/Instagram e revisão para publicação real.
-- Mercado Livre e Shopee têm APIs orientadas a loja/produto, não são redes sociais puras; a publicação real precisa mapear produto/anúncio conforme as regras de cada marketplace.
+- Criar apps oficiais nos portais Meta, TikTok, Google, Mercado Livre e Shopee.
+- Passar pelas revisões/auditorias exigidas para publicar publicamente.
+- Usar storage público real para vídeos/imagens gerados.
+- Ativar banco PostgreSQL em produção e rodar `npm run db:deploy`.
