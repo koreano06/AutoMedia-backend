@@ -26,6 +26,16 @@ export async function registerPlatformsRoutes(app: FastifyInstance) {
     return platformsService.disconnect(platform);
   });
 
+  app.post("/:platform/refresh-token", async (request) => {
+    const { platform } = platformParamSchema.parse(request.params);
+    return platformsService.refresh(platform);
+  });
+
+  app.post("/:platform/sync-account", async (request) => {
+    const { platform } = platformParamSchema.parse(request.params);
+    return platformsService.syncAccount(platform);
+  });
+
   app.post("/:platform/publish", async (request) => {
     const { platform } = platformParamSchema.parse(request.params);
     return platformsService.publish(platform, publishPayloadSchema.parse(request.body));

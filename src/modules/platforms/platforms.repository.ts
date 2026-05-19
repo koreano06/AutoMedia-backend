@@ -86,10 +86,18 @@ export const platformsRepository = {
   },
 
   async updateAccount(platform: string, payload: Partial<PlatformAccount>) {
-    const updated = await prisma.platformAccount.update({
+    const data = toPrismaPayload(payload);
+    const updated = await prisma.platformAccount.upsert({
       where: { platform },
-      data: {
-        ...toPrismaPayload(payload),
+      update: {
+        ...data,
+        lastSyncAt: new Date(),
+      },
+      create: {
+        ...data,
+        platform,
+        accountName: payload.account_name || (platform === "mercadolivre" ? "Mercado Livre" : platform.charAt(0).toUpperCase() + platform.slice(1)),
+        status: payload.status || "disconnected",
         lastSyncAt: new Date(),
       },
     });

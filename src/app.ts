@@ -107,6 +107,14 @@ export function buildApp() {
       const { platform } = request.body as { platform: string };
       return platformsService.disconnect(platform);
     });
+    api.post("/platform-refresh-token", async (request) => {
+      const { platform } = request.body as { platform: string };
+      return platformsService.refresh(platform);
+    });
+    api.post("/platform-sync-account", async (request) => {
+      const { platform } = request.body as { platform: string };
+      return platformsService.syncAccount(platform);
+    });
     api.post("/platform-publish", async (request) => {
       const { platform, ...payload } = request.body as { platform: string; [key: string]: unknown };
       return platformsService.publish(platform, {

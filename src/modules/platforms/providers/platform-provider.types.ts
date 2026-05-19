@@ -37,5 +37,7 @@ export type PlatformProvider = {
   isConfigured(): boolean;
   getAuthUrl(state: string): string;
   exchangeCode(code: string, extra?: Record<string, string | undefined>): Promise<OAuthTokenResult>;
+  refreshToken?(account: PlatformAccount): Promise<OAuthTokenResult>;
+  getAccountInfo?(account: PlatformAccount): Promise<unknown>;
   publish(account: PlatformAccount, payload: PublishPayload): Promise<PublishResult>;
 };

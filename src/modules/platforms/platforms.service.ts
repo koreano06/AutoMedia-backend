@@ -16,6 +16,31 @@ function expiresAt(expiresIn?: number) {
   return new Date(Date.now() + expiresIn * 1000).toISOString();
 }
 
+async function persistToken(platform: string, providerScopes: string[], token: {
+  access_token: string;
+  refresh_token?: string;
+  token_type?: string;
+  scopes?: string[];
+  expires_in?: number;
+  account_id?: string;
+  provider_user_id?: string;
+  account_name?: string;
+}, metadata: Record<string, string | number | boolean>) {
+  return platformsRepository.updateAccount(platform, {
+    status: "connected",
+    access_token: token.access_token,
+    refresh_token: token.refresh_token,
+    token_type: token.token_type || "Bearer",
+    scopes: token.scopes || providerScopes,
+    expires_at: expiresAt(token.expires_in),
+    account_id: token.account_id,
+    provider_user_id: token.provider_user_id,
+    account_name: token.account_name || `${platform} conectado`,
+    error_message: undefined,
+    metadata,
+  });
+}
+
 function setupHint(platform: string, configured: boolean) {
   if (env.SOCIAL_INTEGRATIONS_MODE === "mock") return "Modo teste ativo. Use live para OAuth real.";
   if (configured) return "Credenciais configuradas. Pronto para autorizar OAuth.";
@@ -107,21 +132,39 @@ export const platformsService = {
     if (env.SOCIAL_INTEGRATIONS_MODE === "live") ensureConfigured(provider);
 
     const token = await provider.exchangeCode(query.code, { shop_id: query.shop_id });
-    const account = await platformsRepository.updateAccount(platform, {
-      status: "connected",
-      access_token: token.access_token,
-      refresh_token: token.refresh_token,
-      token_type: token.token_type || "Bearer",
-      scopes: token.scopes || provider.requiredScopes,
-      expires_at: expiresAt(token.expires_in),
-      account_id: token.account_id,
-      provider_user_id: token.provider_user_id,
-      account_name: token.account_name || `${platform} conectado`,
-      error_message: undefined,
-      metadata: { connected_at: nowIso(), mode: env.SOCIAL_INTEGRATIONS_MODE },
-    });
+    const account = await persistToken(platform, provider.requiredScopes, token, { connected_at: nowIso(), mode: env.SOCIAL_INTEGRATIONS_MODE });
 
     return { account, redirect_url: `${env.FRONTEND_URL}/integrations?platform=${platform}&connected=1` };
+  },
+
+  async refresh(platform: string) {
+    const account = await platformsRepository.findByPlatform(platform);
+    const provider = getPlatformProvider(platform);
+    if (!account || !provider) throw new AppError("Plataforma não suportada", 404, "PLATFORM_NOT_FOUND");
+    if (!provider.refreshToken) throw new AppError("Refresh token não suportado nesta plataforma", 400, "PLATFORM_REFRESH_UNSUPPORTED");
+
+    const token = await provider.refreshToken(account);
+    return persistToken(platform, provider.requiredScopes, token, { refreshed_at: nowIso(), mode: env.SOCIAL_INTEGRATIONS_MODE });
+  },
+
+  async syncAccount(platform: string) {
+    const account = await platformsRepository.findByPlatform(platform);
+    const provider = getPlatformProvider(platform);
+    if (!account || !provider) throw new AppError("Plataforma não suportada", 404, "PLATFORM_NOT_FOUND");
+    if (!provider.getAccountInfo) throw new AppError("Sincronização não suportada nesta plataforma", 400, "PLATFORM_SYNC_UNSUPPORTED");
+    if (account.status !== "connected" || !account.access_token) throw new AppError("Plataforma não conectada", 409, "PLATFORM_NOT_CONNECTED");
+
+    const info = await provider.getAccountInfo(account);
+    const updated = await platformsRepository.updateAccount(platform, {
+      last_sync_at: nowIso(),
+      metadata: {
+        ...(account.metadata || {}),
+        synced_at: nowIso(),
+        mode: env.SOCIAL_INTEGRATIONS_MODE,
+      },
+    });
+
+    return { account: updated, info };
   },
 
   async disconnect(platform: string) {

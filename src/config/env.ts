@@ -27,6 +27,7 @@ const envSchema = z.object({
   SHOPEE_PARTNER_ID: z.string().optional(),
   SHOPEE_PARTNER_KEY: z.string().optional(),
   SHOPEE_REDIRECT_URI: z.string().url().optional(),
+  SHOPEE_API_BASE_URL: z.string().url().default("https://partner.shopeemobile.com"),
   STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
   UPLOADS_DIR: z.string().default("uploads"),
 });

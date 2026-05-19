@@ -32,7 +32,8 @@ SHOPEE_REDIRECT_URI="https://auto-media-backend.vercel.app/api/platform-callback
 - Facebook: publica texto ou foto em uma Page via Graph API.
 - TikTok: inicia Direct Post via Content Posting API usando `PULL_FROM_URL`. O domínio da mídia precisa estar verificado no TikTok.
 - YouTube: faz upload resumível via YouTube Data API para vídeos pequenos. Para produção com vídeos grandes, mova o upload para worker/fila dedicada.
-- Mercado Livre/Shopee: em `live`, retornam erro orientativo porque marketplace exige fluxo de anúncio/catálogo, não post social.
+- Shopee: OAuth v2 preparado com assinatura HMAC, troca de `code` por `access_token`/`refresh_token`, refresh token e sincronização básica de loja por `get_shop_info`.
+- Mercado Livre/Shopee catálogo: marketplace exige fluxo de anúncio/catálogo, não post social. A criação completa de item ainda precisa mapear categoria, atributos obrigatórios, logística, estoque, preço e imagens.
 
 ## Variáveis
 
@@ -72,7 +73,22 @@ MERCADOLIVRE_CLIENT_ID=""
 MERCADOLIVRE_CLIENT_SECRET=""
 SHOPEE_PARTNER_ID=""
 SHOPEE_PARTNER_KEY=""
+SHOPEE_API_BASE_URL="https://partner.shopeemobile.com"
 ```
+
+## Shopee
+
+Para conectar uma loja Shopee de forma correta:
+
+1. Crie um app na Shopee Open Platform.
+2. Configure `SHOPEE_PARTNER_ID`, `SHOPEE_PARTNER_KEY` e `SHOPEE_REDIRECT_URI`.
+3. Use a tela de integrações para gerar a URL de autorização.
+4. A Shopee redireciona para `/api/platform-callback?platform=shopee&code=...&shop_id=...`.
+5. O backend chama `/api/v2/auth/token/get`, salva `access_token`, `refresh_token` e `shop_id`.
+6. Use `POST /api/platform-sync-account` com `{ "platform": "shopee" }` para validar a loja conectada.
+7. Use `POST /api/platform-refresh-token` com `{ "platform": "shopee" }` para renovar tokens.
+
+Não use e-mail/senha da loja no backend. A integração profissional usa OAuth e chaves de parceiro.
 
 ## Pendências fora do código
 
