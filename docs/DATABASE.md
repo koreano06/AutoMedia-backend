@@ -64,13 +64,16 @@ Depois rode migrations no ambiente de deploy ou local apontando para o banco de 
 npm run db:deploy
 ```
 
-## Próximo Passo
+## Status Atual
 
-O schema já está pronto. A próxima etapa é trocar os repositories em memória por repositories Prisma, começando por:
+Os módulos principais já usam Prisma/PostgreSQL como fonte de dados:
 
-1. `products`
-2. `media`
-3. `posts`
-4. `comments`
-5. `settings`
-6. `platforms`
+- `products`
+- `media`
+- `posts`
+- `comments`
+- `jobs`
+- `settings`
+- `platforms`
+
+O banco em memória fica apenas como referência histórica/dados demo antigos, não como storage principal da API.

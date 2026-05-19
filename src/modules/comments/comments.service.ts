@@ -1,7 +1,7 @@
 import { productsRepository } from "../products/products.repository.js";
 import { commentsRepository } from "./comments.repository.js";
 import { AppError } from "../../shared/errors/AppError.js";
-import { nowIso } from "../../shared/store/in-memory-db.js";
+import { nowIso } from "../../shared/utils/dates.js";
 import type { Comment } from "../../shared/types/domain.js";
 
 const purchaseKeywords = ["eu quero", "quanto custa", "comprar", "link", "preço", "onde compro"];
@@ -29,10 +29,10 @@ export const commentsService = {
     return commentsRepository.update(id, payload);
   },
 
-  autoReply(payload: { comment_id: string; product_id?: string; reply_template: string }) {
-    const comment = commentsRepository.findById(payload.comment_id);
+  async autoReply(payload: { comment_id: string; product_id?: string; reply_template: string }) {
+    const comment = await commentsRepository.findById(payload.comment_id);
     if (!comment) throw new AppError("Comentário não encontrado", 404, "COMMENT_NOT_FOUND");
-    const product = payload.product_id ? productsRepository.findById(payload.product_id) : null;
+    const product = payload.product_id ? await productsRepository.findById(payload.product_id) : null;
     const productUrl = product?.affiliate_url || product?.product_url || product?.source_url || "link indisponível";
     const reply = payload.reply_template.replace("{{product_url}}", productUrl);
 

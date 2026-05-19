@@ -1,9 +1,10 @@
 import { platformsRepository } from "./platforms.repository.js";
 import { AppError } from "../../shared/errors/AppError.js";
 import { env } from "../../config/env.js";
-import { nowIso } from "../../shared/store/in-memory-db.js";
+import { nowIso } from "../../shared/utils/dates.js";
 import { getPlatformProvider, listPlatformProviders } from "./providers/index.js";
 import { ensureConfigured } from "./providers/provider-utils.js";
+import type { PlatformAccount } from "../../shared/types/domain.js";
 import type { PublishPayload } from "./providers/platform-provider.types.js";
 
 function encodeState(platform: string) {
@@ -34,7 +35,7 @@ function setupHint(platform: string, configured: boolean) {
 export const platformsService = {
   async listAccounts() {
     const providers = listPlatformProviders();
-    const accounts = await platformsRepository.listAccounts();
+    const accounts: PlatformAccount[] = await platformsRepository.listAccounts();
     return accounts.map((account) => {
       const provider = providers.find((item) => item.platform === account.platform);
       const configured = provider?.isConfigured() || env.SOCIAL_INTEGRATIONS_MODE === "mock";

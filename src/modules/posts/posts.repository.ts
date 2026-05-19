@@ -1,5 +1,6 @@
-import { db } from "../../shared/store/in-memory-db.js";
-import { createMemoryRepository } from "../../shared/repositories/memory.repository.js";
+import { prisma } from "../../database/prisma.js";
+import { postFieldMap } from "../../shared/repositories/field-maps.js";
+import { createPrismaRepository } from "../../shared/repositories/prisma.repository.js";
 import type { Post } from "../../shared/types/domain.js";
 
-export const postsRepository = createMemoryRepository<Post>(db.posts, "post");
+export const postsRepository = createPrismaRepository<Post>(prisma.post, "post", postFieldMap);

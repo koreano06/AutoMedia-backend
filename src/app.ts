@@ -76,7 +76,7 @@ export function buildApp() {
         file_size?: number;
       };
 
-      const asset = mediaRepository.create({
+      const asset = await mediaRepository.create({
         product_id: body.product_id,
         product_name: body.product_name,
         type: "image",

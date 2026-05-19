@@ -11,7 +11,7 @@ export async function registerJobsRoutes(app: FastifyInstance) {
     return jobsService.get(id);
   });
 
-  app.post("/", async (request, reply) => created(reply, jobsService.create(createJobSchema.parse(request.body))));
+  app.post("/", async (request, reply) => created(reply, await jobsService.create(createJobSchema.parse(request.body))));
 
   app.patch("/:id", async (request) => {
     const { id } = request.params as { id: string };

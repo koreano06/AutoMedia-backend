@@ -15,9 +15,9 @@ function margin(product: { price?: number | string; cost_price?: number | string
 }
 
 export const commercialService = {
-  summary() {
-    const products = productsRepository.list("-created_at", 1000);
-    const comments = commentsRepository.list("-detected_at", 1000);
+  async summary() {
+    const products = await productsRepository.list("-created_at", 1000);
+    const comments = await commentsRepository.list("-detected_at", 1000);
     const lowStock = products.filter((product) => asNumber(product.stock_quantity) <= asNumber(product.min_stock || 5));
     const purchaseLeads = comments.filter((comment) => comment.is_purchase_intent);
     const averageMargin = products.length ? Math.round(products.reduce((sum, product) => sum + margin(product), 0) / products.length) : 0;

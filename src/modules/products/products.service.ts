@@ -27,11 +27,11 @@ export const productsService = {
     return productsRepository.delete(id);
   },
 
-  analyze(payload: { product_id?: string; source_url?: string; image_asset_id?: string }) {
-    const product = payload.product_id ? productsRepository.findById(payload.product_id) : null;
+  async analyze(payload: { product_id?: string; source_url?: string; image_asset_id?: string }) {
+    const product = payload.product_id ? await productsRepository.findById(payload.product_id) : null;
     if (payload.product_id && !product) throw new AppError("Produto não encontrado para análise", 404, "PRODUCT_NOT_FOUND");
 
-    const targetProduct = product || productsRepository.create({
+    const targetProduct = product || await productsRepository.create({
       name: "Produto em análise",
       source_url: payload.source_url,
       input_source: payload.source_url ? "product_url" : "image_upload",
@@ -41,7 +41,7 @@ export const productsService = {
       videos_generated: 0,
     });
 
-    const job = jobsRepository.create({
+    const job = await jobsRepository.create({
       type: "product_analysis",
       status: "queued",
       title: `Análise de produto - ${targetProduct.name}`,

@@ -4,11 +4,11 @@ import { productsRepository } from "../products/products.repository.js";
 import { AppError } from "../../shared/errors/AppError.js";
 
 export const videosService = {
-  generate(payload: { product_id: string; media_asset_ids: string[]; style: string; duration: string; briefing?: string; platform?: string }) {
-    const product = productsRepository.findById(payload.product_id);
+  async generate(payload: { product_id: string; media_asset_ids: string[]; style: string; duration: string; briefing?: string; platform?: string }) {
+    const product = await productsRepository.findById(payload.product_id);
     if (!product) throw new AppError("Produto não encontrado para geração de vídeo", 404, "PRODUCT_NOT_FOUND");
 
-    const job = jobsRepository.create({
+    const job = await jobsRepository.create({
       type: "video_generation",
       status: "queued",
       title: `Gerar vídeo ${payload.style} - ${product.name}`,
@@ -16,7 +16,7 @@ export const videosService = {
       progress: 0,
     });
 
-    const asset = mediaRepository.create({
+    const asset = await mediaRepository.create({
       product_id: product.id,
       product_name: product.name,
       type: "generated_video",

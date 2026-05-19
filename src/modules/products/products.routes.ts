@@ -11,12 +11,12 @@ export async function registerProductsRoutes(app: FastifyInstance) {
 
   app.post("/", async (request, reply) => {
     const payload = productPayloadSchema.parse(request.body);
-    return created(reply, productsService.create(payload));
+    return created(reply, await productsService.create(payload));
   });
 
   app.post("/analyze", async (request, reply) => {
     const payload = productAnalyzeSchema.parse(request.body);
-    return accepted(reply, productsService.analyze(payload));
+    return accepted(reply, await productsService.analyze(payload));
   });
 
   app.patch("/:id", async (request) => {

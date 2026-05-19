@@ -11,7 +11,8 @@
     "db:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio --schema prisma/schema.prisma",
-    "build": "tsc -p tsconfig.json",
+    "build": "prisma generate --schema prisma/schema.prisma && tsc -p tsconfig.json",
+    "build:vercel": "prisma migrate deploy --schema prisma/schema.prisma && npm run build",
     "start": "node dist/src/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"

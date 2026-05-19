@@ -9,7 +9,7 @@ export async function registerCommentsRoutes(app: FastifyInstance) {
     return commentsService.list(query.order, query.limit ? Number(query.limit) : undefined);
   });
 
-  app.post("/", async (request, reply) => created(reply, commentsService.create(commentPayloadSchema.parse(request.body))));
+  app.post("/", async (request, reply) => created(reply, await commentsService.create(commentPayloadSchema.parse(request.body))));
 
   app.post("/auto-reply", async (request) => commentsService.autoReply(autoReplySchema.parse(request.body)));
 

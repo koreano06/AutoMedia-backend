@@ -1,7 +1,7 @@
 import { mediaRepository } from "../media/media.repository.js";
 import { postsRepository } from "./posts.repository.js";
 import { AppError } from "../../shared/errors/AppError.js";
-import { nowIso } from "../../shared/store/in-memory-db.js";
+import { nowIso } from "../../shared/utils/dates.js";
 import type { Post } from "../../shared/types/domain.js";
 import { platformsService } from "../platforms/platforms.service.js";
 
@@ -28,11 +28,11 @@ export const postsService = {
     return postsRepository.delete(id);
   },
 
-  schedule(payload: { media_asset_id: string; platforms: string[]; caption: string; schedule_mode: "now" | "scheduled" | "random_window"; scheduled_at?: string }) {
-    const asset = mediaRepository.findById(payload.media_asset_id);
+  async schedule(payload: { media_asset_id: string; platforms: string[]; caption: string; schedule_mode: "now" | "scheduled" | "random_window"; scheduled_at?: string }) {
+    const asset = await mediaRepository.findById(payload.media_asset_id);
     if (!asset) throw new AppError("Mídia não encontrada para agendamento", 404, "MEDIA_NOT_FOUND");
 
-    return payload.platforms.map((platform) => postsRepository.create({
+    return Promise.all(payload.platforms.map((platform) => postsRepository.create({
       media_asset_id: asset.id,
       product_id: asset.product_id,
       product_name: asset.product_name,
@@ -46,11 +46,11 @@ export const postsService = {
       engagement_comments: 0,
       engagement_shares: 0,
       engagement_reach: 0,
-    }));
+    })));
   },
 
   async publishNow(id: string) {
-    const post = postsRepository.findById(id);
+    const post = await postsRepository.findById(id);
     if (!post) throw new AppError("Post não encontrado", 404, "POST_NOT_FOUND");
     if (!post.platform) throw new AppError("Post sem plataforma definida", 400, "POST_PLATFORM_MISSING");
 

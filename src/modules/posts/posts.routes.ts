@@ -9,9 +9,9 @@ export async function registerPostsRoutes(app: FastifyInstance) {
     return postsService.list(query.order, query.limit ? Number(query.limit) : undefined);
   });
 
-  app.post("/", async (request, reply) => created(reply, postsService.create(postPayloadSchema.parse(request.body))));
+  app.post("/", async (request, reply) => created(reply, await postsService.create(postPayloadSchema.parse(request.body))));
 
-  app.post("/schedule", async (request, reply) => created(reply, postsService.schedule(schedulePostSchema.parse(request.body))));
+  app.post("/schedule", async (request, reply) => created(reply, await postsService.schedule(schedulePostSchema.parse(request.body))));
 
   app.post("/:id/publish-now", async (request) => {
     const { id } = request.params as { id: string };

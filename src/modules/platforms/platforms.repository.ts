@@ -1,9 +1,7 @@
-import { db } from "../../shared/store/in-memory-db.js";
 import type { PlatformAccount } from "../../shared/types/domain.js";
 import { prisma } from "../../database/prisma.js";
 
 const seedPlatforms = ["instagram", "tiktok", "facebook", "youtube", "shopee", "mercadolivre"];
-const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
 
 function toDomain(account: {
   id: string;
@@ -66,63 +64,35 @@ async function seedDatabaseAccounts() {
   ));
 }
 
-async function withDatabase<T>(operation: () => Promise<T>, fallback: () => T) {
-  if (!hasDatabaseUrl) return fallback();
-
-  try {
-    return await operation();
-  } catch {
-    return fallback();
-  }
-}
-
 export const platformsRepository = {
   async listAccounts() {
-    return withDatabase(async () => {
-      await seedDatabaseAccounts();
-      const accounts = await prisma.platformAccount.findMany({ orderBy: { platform: "asc" } });
-      return accounts.map(toDomain);
-    }, () => db.platformAccounts);
+    await seedDatabaseAccounts();
+    const accounts = await prisma.platformAccount.findMany({ orderBy: { platform: "asc" } });
+    return accounts.map(toDomain);
   },
 
   async findByPlatform(platform: string) {
-    return withDatabase(async () => {
-      await seedDatabaseAccounts();
-      const account = await prisma.platformAccount.findUnique({ where: { platform } });
-      return account ? toDomain(account) : null;
-    }, () => db.platformAccounts.find((item) => item.platform === platform) || null);
+    await seedDatabaseAccounts();
+    const account = await prisma.platformAccount.findUnique({ where: { platform } });
+    return account ? toDomain(account) : null;
   },
 
   async updateStatus(platform: string, status: "connected" | "expired" | "error" | "disconnected") {
-    const account = db.platformAccounts.find((item) => item.platform === platform);
-    if (!account) return null;
-    account.status = status;
-    account.last_sync_at = new Date().toISOString();
-
-    return withDatabase(async () => {
-      const updated = await prisma.platformAccount.update({
-        where: { platform },
-        data: { status, lastSyncAt: new Date() },
-      });
-      return toDomain(updated);
-    }, () => account);
+    const updated = await prisma.platformAccount.update({
+      where: { platform },
+      data: { status, lastSyncAt: new Date() },
+    });
+    return toDomain(updated);
   },
 
   async updateAccount(platform: string, payload: Partial<PlatformAccount>) {
-    const account = db.platformAccounts.find((item) => item.platform === platform);
-    if (!account) return null;
-
-    Object.assign(account, payload, { last_sync_at: new Date().toISOString() });
-
-    return withDatabase(async () => {
-      const updated = await prisma.platformAccount.update({
-        where: { platform },
-        data: {
-          ...toPrismaPayload(payload),
-          lastSyncAt: new Date(),
-        },
-      });
-      return toDomain(updated);
-    }, () => account);
+    const updated = await prisma.platformAccount.update({
+      where: { platform },
+      data: {
+        ...toPrismaPayload(payload),
+        lastSyncAt: new Date(),
+      },
+    });
+    return toDomain(updated);
   },
 };

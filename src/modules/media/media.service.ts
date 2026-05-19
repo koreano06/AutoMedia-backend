@@ -19,8 +19,8 @@ export const mediaService = {
     return mediaRepository.update(id, payload);
   },
 
-  collect(payload: { product_id: string; query?: string; sources: string[] }) {
-    const job = jobsRepository.create({
+  async collect(payload: { product_id: string; query?: string; sources: string[] }) {
+    const job = await jobsRepository.create({
       type: "media_collection",
       status: "queued",
       title: `Coleta de mídia - ${payload.query || payload.product_id}`,
