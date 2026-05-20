@@ -59,6 +59,7 @@ model Product {
   analyses ProductAnalysis[]
   media    MediaAsset[]
   posts    Post[]
+  marketplaceListings MarketplaceListing[]
 
   @@index([status])
   @@index([category])
@@ -210,6 +211,40 @@ model PostMetric {
   @@index([postId])
   @@index([capturedAt])
   @@map("post_metrics")
+}
+
+model MarketplaceListing {
+  id                String    @id @default(cuid())
+  productId         String    @map("product_id")
+  platform          String
+  title             String
+  description       String?
+  price             Decimal?  @db.Decimal(12, 2)
+  stockQuantity     Int?      @map("stock_quantity")
+  currency          String?   @default("BRL")
+  sku               String?
+  categoryId        String?   @map("category_id")
+  categoryName      String?   @map("category_name")
+  attributes        Json?
+  logistics         Json?
+  status            String    @default("draft")
+  externalListingId String?   @map("external_listing_id")
+  externalUrl       String?   @map("external_url")
+  errorMessage      String?   @map("error_message")
+  publishedAt       DateTime? @map("published_at")
+  lastSyncAt        DateTime? @map("last_sync_at")
+  metadata          Json?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([platform])
+  @@index([status])
+  @@index([externalListingId])
+  @@index([createdAt])
+  @@map("marketplace_listings")
 }
 
 model Comment {

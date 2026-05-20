@@ -19,6 +19,7 @@ import { registerCommercialRoutes } from "./modules/commercial/commercial.routes
 import { registerUploadsRoutes } from "./modules/media/uploads.routes.js";
 import { registerAIRoutes } from "./modules/ai/ai.routes.js";
 import { registerMetaRoutes } from "./modules/meta/meta.routes.js";
+import { registerMarketplaceListingsRoutes } from "./modules/marketplace-listings/marketplace-listings.routes.js";
 import { platformsService } from "./modules/platforms/platforms.service.js";
 import { postsService } from "./modules/posts/posts.service.js";
 import { productsService } from "./modules/products/products.service.js";
@@ -129,6 +130,7 @@ export function buildApp() {
         scheduled_at: payload.scheduled_at as string | undefined,
       });
     });
+    api.register(registerMarketplaceListingsRoutes, { prefix: "/marketplace-listings" });
     api.post("/post-publish-now", async (request) => {
       const { id } = request.body as { id: string };
       return postsService.publishNow(id);

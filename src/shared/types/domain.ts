@@ -124,6 +124,31 @@ export type Post = {
   last_sync_at?: ISODateString;
 };
 
+export type MarketplaceListing = {
+  id: EntityId;
+  product_id: EntityId;
+  platform: Platform;
+  title: string;
+  description?: string;
+  price?: number | string;
+  stock_quantity?: number;
+  currency?: string;
+  sku?: string;
+  category_id?: string;
+  category_name?: string;
+  attributes?: Record<string, string | number | boolean>;
+  logistics?: Record<string, string | number | boolean>;
+  status?: Status;
+  external_listing_id?: string;
+  external_url?: string;
+  error_message?: string;
+  published_at?: ISODateString;
+  last_sync_at?: ISODateString;
+  metadata?: Record<string, string | number | boolean>;
+  created_at?: ISODateString;
+  updated_at?: ISODateString;
+};
+
 export type Comment = {
   id: EntityId;
   post_id?: EntityId;

@@ -1,5 +1,8 @@
-import "dotenv/config";
+import { config } from "dotenv";
 import { defineConfig } from "prisma/config";
+
+config({ path: ".env.local" });
+config();
 
 const databaseUrl = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/automedia?schema=public";
 

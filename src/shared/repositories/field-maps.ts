@@ -61,6 +61,20 @@ export const postFieldMap = {
   updated_at: "updatedAt",
 };
 
+export const marketplaceListingFieldMap = {
+  product_id: "productId",
+  stock_quantity: "stockQuantity",
+  category_id: "categoryId",
+  category_name: "categoryName",
+  external_listing_id: "externalListingId",
+  external_url: "externalUrl",
+  error_message: "errorMessage",
+  published_at: "publishedAt",
+  last_sync_at: "lastSyncAt",
+  created_at: "createdAt",
+  updated_at: "updatedAt",
+};
+
 export const commentFieldMap = {
   post_id: "postId",
   external_comment_id: "externalCommentId",
