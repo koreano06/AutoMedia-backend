@@ -75,6 +75,22 @@ export const marketplaceListingFieldMap = {
   updated_at: "updatedAt",
 };
 
+export const salesOrderFieldMap = {
+  customer_name: "customerName",
+  customer_email: "customerEmail",
+  cost_total: "costTotal",
+  external_order_id: "externalOrderId",
+  sold_at: "soldAt",
+  created_at: "createdAt",
+  updated_at: "updatedAt",
+};
+
+export const expenseFieldMap = {
+  spent_at: "spentAt",
+  created_at: "createdAt",
+  updated_at: "updatedAt",
+};
+
 export const commentFieldMap = {
   post_id: "postId",
   external_comment_id: "externalCommentId",

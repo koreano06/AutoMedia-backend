@@ -149,6 +149,53 @@ export type MarketplaceListing = {
   updated_at?: ISODateString;
 };
 
+export type SalesOrderItem = {
+  id: EntityId;
+  order_id: EntityId;
+  product_id?: EntityId;
+  product_name: string;
+  sku?: string;
+  quantity: number;
+  unit_price: number | string;
+  unit_cost?: number | string;
+  total: number | string;
+  profit?: number | string;
+  created_at?: ISODateString;
+};
+
+export type SalesOrder = {
+  id: EntityId;
+  customer_name?: string;
+  customer_email?: string;
+  platform?: Platform;
+  status?: Status;
+  subtotal?: number | string;
+  discount?: number | string;
+  shipping?: number | string;
+  total?: number | string;
+  cost_total?: number | string;
+  profit?: number | string;
+  currency?: string;
+  external_order_id?: string;
+  sold_at?: ISODateString;
+  metadata?: Record<string, string | number | boolean>;
+  created_at?: ISODateString;
+  updated_at?: ISODateString;
+  items?: SalesOrderItem[];
+};
+
+export type Expense = {
+  id: EntityId;
+  category: string;
+  description?: string;
+  amount: number | string;
+  currency?: string;
+  spent_at?: ISODateString;
+  metadata?: Record<string, string | number | boolean>;
+  created_at?: ISODateString;
+  updated_at?: ISODateString;
+};
+
 export type Comment = {
   id: EntityId;
   post_id?: EntityId;

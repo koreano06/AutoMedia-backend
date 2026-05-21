@@ -96,7 +96,7 @@ export const marketplaceListingsService = {
       status: "published",
       external_listing_id: externalId,
       external_url: `https://example.com/${listing.platform}/listing/${externalId}`,
-      error_message: undefined,
+      error_message: "",
       published_at: now,
       last_sync_at: now,
       metadata: {

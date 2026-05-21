@@ -60,6 +60,7 @@ model Product {
   media    MediaAsset[]
   posts    Post[]
   marketplaceListings MarketplaceListing[]
+  salesOrderItems SalesOrderItem[]
 
   @@index([status])
   @@index([category])
@@ -245,6 +246,71 @@ model MarketplaceListing {
   @@index([externalListingId])
   @@index([createdAt])
   @@map("marketplace_listings")
+}
+
+model SalesOrder {
+  id              String    @id @default(cuid())
+  customerName    String?   @map("customer_name")
+  customerEmail   String?   @map("customer_email")
+  platform        String?
+  status          String    @default("paid")
+  subtotal        Decimal   @default(0) @db.Decimal(12, 2)
+  discount        Decimal   @default(0) @db.Decimal(12, 2)
+  shipping        Decimal   @default(0) @db.Decimal(12, 2)
+  total           Decimal   @default(0) @db.Decimal(12, 2)
+  costTotal       Decimal   @default(0) @map("cost_total") @db.Decimal(12, 2)
+  profit          Decimal   @default(0) @db.Decimal(12, 2)
+  currency        String    @default("BRL")
+  externalOrderId String?   @map("external_order_id")
+  soldAt          DateTime  @default(now()) @map("sold_at")
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  items SalesOrderItem[]
+
+  @@index([platform])
+  @@index([status])
+  @@index([soldAt])
+  @@index([externalOrderId])
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id          String   @id @default(cuid())
+  orderId     String   @map("order_id")
+  productId   String?  @map("product_id")
+  productName String   @map("product_name")
+  sku         String?
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(12, 2)
+  unitCost    Decimal  @default(0) @map("unit_cost") @db.Decimal(12, 2)
+  total       Decimal  @db.Decimal(12, 2)
+  profit      Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  order   SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("sales_order_items")
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  category    String
+  description String?
+  amount      Decimal  @db.Decimal(12, 2)
+  currency    String   @default("BRL")
+  spentAt     DateTime @default(now()) @map("spent_at")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([spentAt])
+  @@map("expenses")
 }
 
 model Comment {
