@@ -19,7 +19,9 @@ export const productFieldMap = {
   posts_published: "postsPublished",
   videos_generated: "videosGenerated",
   created_at: "createdAt",
+  created_date: "createdAt",
   updated_at: "updatedAt",
+  updated_date: "updatedAt",
 };
 
 export const mediaAssetFieldMap = {
@@ -37,7 +39,9 @@ export const mediaAssetFieldMap = {
   previous_status: "previousStatus",
   rejection_reason: "rejectionReason",
   created_at: "createdAt",
+  created_date: "createdAt",
   updated_at: "updatedAt",
+  updated_date: "updatedAt",
 };
 
 export const postFieldMap = {
@@ -58,7 +62,9 @@ export const postFieldMap = {
   retry_count: "retryCount",
   last_sync_at: "lastSyncAt",
   created_at: "createdAt",
+  created_date: "createdAt",
   updated_at: "updatedAt",
+  updated_date: "updatedAt",
 };
 
 export const marketplaceListingFieldMap = {
@@ -72,7 +78,9 @@ export const marketplaceListingFieldMap = {
   published_at: "publishedAt",
   last_sync_at: "lastSyncAt",
   created_at: "createdAt",
+  created_date: "createdAt",
   updated_at: "updatedAt",
+  updated_date: "updatedAt",
 };
 
 export const salesOrderFieldMap = {
@@ -82,13 +90,17 @@ export const salesOrderFieldMap = {
   external_order_id: "externalOrderId",
   sold_at: "soldAt",
   created_at: "createdAt",
+  created_date: "createdAt",
   updated_at: "updatedAt",
+  updated_date: "updatedAt",
 };
 
 export const expenseFieldMap = {
   spent_at: "spentAt",
   created_at: "createdAt",
+  created_date: "createdAt",
   updated_at: "updatedAt",
+  updated_date: "updatedAt",
 };
 
 export const commentFieldMap = {
@@ -100,7 +112,9 @@ export const commentFieldMap = {
   detected_at: "detectedAt",
   replied_at: "repliedAt",
   created_at: "createdAt",
+  created_date: "createdAt",
   updated_at: "updatedAt",
+  updated_date: "updatedAt",
 };
 
 export const jobFieldMap = {
@@ -110,6 +124,8 @@ export const jobFieldMap = {
   result_url: "resultUrl",
   error_message: "errorMessage",
   created_at: "createdAt",
+  created_date: "createdAt",
   updated_at: "updatedAt",
+  updated_date: "updatedAt",
   completed_at: "completedAt",
 };
