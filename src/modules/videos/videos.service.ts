@@ -6,12 +6,12 @@ import { AppError } from "../../shared/errors/AppError.js";
 export const videosService = {
   async generate(payload: { product_id: string; media_asset_ids: string[]; style: string; duration: string; briefing?: string; platform?: string }) {
     const product = await productsRepository.findById(payload.product_id);
-    if (!product) throw new AppError("Produto não encontrado para geração de vídeo", 404, "PRODUCT_NOT_FOUND");
+    if (!product) throw new AppError("Anúncio base não encontrado para geração de vídeo", 404, "AD_NOT_FOUND");
 
     const job = await jobsRepository.create({
       type: "video_generation",
       status: "queued",
-      title: `Gerar vídeo ${payload.style} - ${product.name}`,
+      title: `Gerar vídeo de divulgação ${payload.style} - ${product.name}`,
       product_id: product.id,
       progress: 0,
     });
@@ -20,7 +20,7 @@ export const videosService = {
       product_id: product.id,
       product_name: product.name,
       type: "generated_video",
-      title: `Vídeo ${payload.style} - ${product.name}`,
+      title: `Vídeo de divulgação ${payload.style} - ${product.name}`,
       status: "generating",
       source: "backend_job",
       url: product.image_url || product.uploaded_image_url || "",

@@ -11,7 +11,7 @@ export const productsService = {
   create(payload: Partial<Product>) {
     return productsRepository.create({
       ...payload,
-      name: payload.name || "Produto sem nome",
+      name: payload.name || "Anúncio sem nome",
       status: payload.status || "analyzing",
       media_count: payload.media_count || 0,
       posts_published: payload.posts_published || 0,
@@ -29,10 +29,10 @@ export const productsService = {
 
   async analyze(payload: { product_id?: string; source_url?: string; image_asset_id?: string }) {
     const product = payload.product_id ? await productsRepository.findById(payload.product_id) : null;
-    if (payload.product_id && !product) throw new AppError("Produto não encontrado para análise", 404, "PRODUCT_NOT_FOUND");
+    if (payload.product_id && !product) throw new AppError("Anúncio base não encontrado para análise", 404, "AD_NOT_FOUND");
 
     const targetProduct = product || await productsRepository.create({
-      name: "Produto em análise",
+      name: "Anúncio em análise",
       source_url: payload.source_url,
       input_source: payload.source_url ? "product_url" : "image_upload",
       status: "analyzing",
@@ -44,7 +44,7 @@ export const productsService = {
     const job = await jobsRepository.create({
       type: "product_analysis",
       status: "queued",
-      title: `Análise de produto - ${targetProduct.name}`,
+      title: `Análise de anúncio base - ${targetProduct.name}`,
       product_id: targetProduct.id,
       progress: 0,
     });

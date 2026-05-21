@@ -23,7 +23,7 @@ export const mediaService = {
     const job = await jobsRepository.create({
       type: "media_collection",
       status: "queued",
-      title: `Coleta de mídia - ${payload.query || payload.product_id}`,
+      title: `Coleta de mídia para anúncio - ${payload.query || payload.product_id}`,
       product_id: payload.product_id,
       progress: 0,
     });

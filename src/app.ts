@@ -20,6 +20,7 @@ import { registerUploadsRoutes } from "./modules/media/uploads.routes.js";
 import { registerAIRoutes } from "./modules/ai/ai.routes.js";
 import { registerMetaRoutes } from "./modules/meta/meta.routes.js";
 import { registerMarketplaceListingsRoutes } from "./modules/marketplace-listings/marketplace-listings.routes.js";
+import { registerMarketplaceSearchRoutes } from "./modules/marketplace-search/marketplace-search.routes.js";
 import { registerFinanceRoutes } from "./modules/finance/finance.routes.js";
 import { platformsService } from "./modules/platforms/platforms.service.js";
 import { postsService } from "./modules/posts/posts.service.js";
@@ -132,6 +133,7 @@ export function buildApp() {
       });
     });
     api.register(registerMarketplaceListingsRoutes, { prefix: "/marketplace-listings" });
+    api.register(registerMarketplaceSearchRoutes, { prefix: "/marketplace-search" });
     api.register(registerFinanceRoutes, { prefix: "/finance" });
     api.post("/post-publish-now", async (request) => {
       const { id } = request.body as { id: string };

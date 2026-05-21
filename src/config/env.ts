@@ -28,6 +28,10 @@ const envSchema = z.object({
   SHOPEE_PARTNER_KEY: z.string().optional(),
   SHOPEE_REDIRECT_URI: z.string().url().optional(),
   SHOPEE_API_BASE_URL: z.string().url().default("https://partner.shopeemobile.com"),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_IMAGE_MODEL: z.string().default("gpt-image-1"),
+  OPENAI_IMAGE_QUALITY: z.enum(["low", "medium", "high"]).default("high"),
+  OPENAI_IMAGE_FALLBACK_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
   UPLOADS_DIR: z.string().default("uploads"),
 });
