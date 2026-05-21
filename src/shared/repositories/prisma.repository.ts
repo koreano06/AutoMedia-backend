@@ -42,7 +42,12 @@ function mapFields(payload: Record<string, unknown>, fieldMap: FieldMap) {
 function orderBy(order = "-created_at", fieldMap: FieldMap) {
   const direction = order.startsWith("-") ? "desc" : "asc";
   const field = order.replace("-", "");
-  return { [fieldMap[field] || field]: direction };
+  const aliases: FieldMap = {
+    created_date: "createdAt",
+    updated_date: "updatedAt",
+  };
+
+  return { [fieldMap[field] || aliases[field] || field]: direction };
 }
 
 function fromPrisma<T>(payload: unknown, reverseFieldMap: FieldMap): T {
