@@ -32,8 +32,13 @@ const envSchema = z.object({
   OPENAI_IMAGE_MODEL: z.string().default("gpt-image-1"),
   OPENAI_IMAGE_QUALITY: z.enum(["low", "medium", "high"]).default("high"),
   OPENAI_IMAGE_FALLBACK_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
-  STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+  STORAGE_DRIVER: z.enum(["local", "s3", "supabase"]).default("local"),
   UPLOADS_DIR: z.string().default("uploads"),
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SUPABASE_STORAGE_BUCKET: z.string().default("videos"),
+  VIDEO_RENDER_DRIVER: z.enum(["ffmpeg", "mock"]).default("ffmpeg"),
+  FFMPEG_PATH: z.string().default("ffmpeg"),
 });
 
 export const env = envSchema.parse(process.env);

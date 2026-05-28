@@ -14,6 +14,7 @@
     "build": "prisma generate --schema prisma/schema.prisma && tsc -p tsconfig.json",
     "build:vercel": "npm run build",
     "start": "node dist/src/server.js",
+    "worker:video": "tsx src/modules/videos/video-generation.worker.cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
