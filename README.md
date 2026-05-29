@@ -16,6 +16,25 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - Integrações sociais com modo `mock` e preparação para modo `live`.
 - Deploy da API preparado para Vercel.
 
+## Status das Funcionalidades
+
+✅ Backend com Fastify e TypeScript  
+✅ Banco PostgreSQL com Prisma  
+✅ Schema para produtos, mídias, jobs, posts, comentários e comercial  
+✅ Autenticação local/JWT  
+✅ Seeds para teste da plataforma  
+✅ Fila BullMQ com Redis  
+✅ Worker FFmpeg para renderização de vídeos  
+✅ Storage local e suporte a Supabase Storage  
+✅ API de geração de imagens com OpenAI Images  
+✅ Integrações sociais em modo `mock`  
+🟡 OpenAI em validação para fluxo profissional de criativos  
+🟡 Supabase Storage em configuração para produção  
+🟡 Worker de vídeo precisa rodar fora da Vercel em ambiente contínuo  
+🔜 Publicação real em redes sociais  
+🔜 Integração live com Shopee, Mercado Livre, TikTok e Meta  
+🔜 Webhooks/polling para comentários e respostas automáticas  
+
 ## Stack
 
 - Node.js
