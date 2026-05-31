@@ -2,7 +2,8 @@ import { jobsRepository } from "./jobs.repository.js";
 import type { Job } from "../../shared/types/domain.js";
 
 export const jobsService = {
-  list() {
+  list(workspaceId?: string) {
+    if (workspaceId) return jobsRepository.filter({ workspace_id: workspaceId }, "-created_at", 100);
     return jobsRepository.list("-created_at", 100);
   },
 
@@ -10,8 +11,8 @@ export const jobsService = {
     return jobsRepository.findById(id);
   },
 
-  create(payload: Partial<Job>) {
-    return jobsRepository.create({ status: "queued", progress: 0, ...payload });
+  create(payload: Partial<Job>, workspaceId?: string) {
+    return jobsRepository.create({ status: "queued", progress: 0, workspace_id: workspaceId, ...payload });
   },
 
   update(id: string, payload: Partial<Job>) {

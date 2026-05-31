@@ -68,16 +68,26 @@ const demoProducts = [
 
 async function main() {
   const passwordHash = await bcrypt.hash("admin123", 10);
+  const workspace = await prisma.workspace.upsert({
+    where: { slug: "automedia" },
+    update: {},
+    create: {
+      id: "workspace_automedia",
+      name: "AutoMedia",
+      slug: "automedia",
+    },
+  });
 
   await prisma.user.upsert({
     where: { username: "admin" },
-    update: {},
+    update: { workspaceId: workspace.id },
     create: {
       name: "Administrador",
       username: "admin",
       passwordHash,
       role: "admin",
       storeName: "AutoMedia",
+      workspaceId: workspace.id,
     },
   });
 
@@ -100,9 +110,10 @@ async function main() {
   await Promise.all(
     platforms.map((platform) =>
       prisma.platformAccount.upsert({
-        where: { platform },
+        where: { workspaceId_platform: { workspaceId: workspace.id, platform } },
         update: {},
         create: {
+          workspaceId: workspace.id,
           platform,
           accountName: platform === "mercadolivre" ? "Mercado Livre" : platform.charAt(0).toUpperCase() + platform.slice(1),
           status: "disconnected",
@@ -132,6 +143,7 @@ async function main() {
         update: {},
         create: {
           ...product,
+          workspaceId: workspace.id,
           inputSource: "manual",
           currency: "BRL",
           imageUrl: `https://placehold.co/900x900?text=${encodeURIComponent(product.name)}`,
@@ -165,6 +177,7 @@ async function main() {
       create: {
         id: `seed_media_image_${product.id}`,
         productId: product.id,
+        workspaceId: workspace.id,
         productName: product.name,
         type: "image",
         title: `Imagem principal - ${product.name}`,
@@ -184,6 +197,7 @@ async function main() {
       create: {
         id: `seed_media_video_${product.id}`,
         productId: product.id,
+        workspaceId: workspace.id,
         productName: product.name,
         type: "generated_video",
         title: `Vídeo IA - ${product.name}`,
@@ -230,6 +244,7 @@ async function main() {
       create: {
         id: `seed_post_scheduled_${product.id}`,
         productId: product.id,
+        workspaceId: workspace.id,
         mediaAssetId: video.id,
         productName: product.name,
         platform: index === 2 ? "tiktok" : "instagram",
@@ -247,6 +262,7 @@ async function main() {
       create: {
         id: `seed_post_published_${product.id}`,
         productId: product.id,
+        workspaceId: workspace.id,
         mediaAssetId: image.id,
         productName: product.name,
         platform: "facebook",
@@ -286,6 +302,7 @@ async function main() {
         author: ["Mariana", "Joao", "Carla"][index],
         content: index === 1 ? "Funciona mesmo? quanto custa?" : "Eu quero o link desse produto",
         platform: publishedPost.platform,
+        workspaceId: workspace.id,
         isPurchaseIntent: true,
         autoReplied: index !== 1,
         replyContent: index !== 1 ? `Claro! Aqui esta o link: ${product.affiliateUrl || product.productUrl}` : null,
@@ -315,6 +332,7 @@ async function main() {
         title: `Job teste - ${product.name}`,
         progress: index === 1 ? 65 : 100,
         productId: product.id,
+        workspaceId: workspace.id,
         mediaAssetId: video.id,
         postId: scheduledPost.id,
         resultUrl: video.url,

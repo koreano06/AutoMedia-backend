@@ -14,16 +14,58 @@ model User {
   passwordHash String   @map("password_hash")
   storeName    String?  @map("store_name")
   role         String   @default("admin")
+  workspaceId  String?  @map("workspace_id")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   approvals Approval[]
+  refreshTokens AuthRefreshToken[]
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@map("users")
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users User[]
+  products Product[]
+  mediaAssets MediaAsset[]
+  posts Post[]
+  comments Comment[]
+  jobs Job[]
+  platformAccounts PlatformAccount[]
+  salesOrders SalesOrder[]
+  expenses Expense[]
+  marketplaceListings MarketplaceListing[]
+
+  @@map("workspaces")
+}
+
+model AuthRefreshToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("auth_refresh_tokens")
 }
 
 model Product {
   id                   String   @id @default(cuid())
+  workspaceId          String?  @map("workspace_id")
   name                 String
   inputSource          String?  @map("input_source")
   sourceUrl            String?  @map("source_url")
@@ -61,7 +103,9 @@ model Product {
   posts    Post[]
   marketplaceListings MarketplaceListing[]
   salesOrderItems SalesOrderItem[]
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@index([status])
   @@index([category])
   @@index([createdAt])
@@ -86,6 +130,7 @@ model ProductAnalysis {
 
 model MediaAsset {
   id              String   @id @default(cuid())
+  workspaceId     String?  @map("workspace_id")
   productId       String?  @map("product_id")
   productName     String?  @map("product_name")
   type            String   @default("image")
@@ -115,7 +160,9 @@ model MediaAsset {
   approvals   Approval[]
   collections MediaCollectionSource[]
   posts       Post[]
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@index([productId])
   @@index([type])
   @@index([status])
@@ -161,6 +208,7 @@ model Approval {
 
 model Post {
   id                 String   @id @default(cuid())
+  workspaceId        String?  @map("workspace_id")
   productId          String?  @map("product_id")
   mediaAssetId       String?  @map("media_asset_id")
   productName        String?  @map("product_name")
@@ -187,7 +235,9 @@ model Post {
   mediaAsset MediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
   comments   Comment[]
   metrics    PostMetric[]
+  workspace  Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@index([productId])
   @@index([mediaAssetId])
   @@index([platform])
@@ -216,6 +266,7 @@ model PostMetric {
 
 model MarketplaceListing {
   id                String    @id @default(cuid())
+  workspaceId       String?   @map("workspace_id")
   productId         String    @map("product_id")
   platform          String
   title             String
@@ -239,7 +290,9 @@ model MarketplaceListing {
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@index([productId])
   @@index([platform])
   @@index([status])
@@ -250,6 +303,7 @@ model MarketplaceListing {
 
 model SalesOrder {
   id              String    @id @default(cuid())
+  workspaceId     String?   @map("workspace_id")
   customerName    String?   @map("customer_name")
   customerEmail   String?   @map("customer_email")
   platform        String?
@@ -268,7 +322,9 @@ model SalesOrder {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   items SalesOrderItem[]
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@index([platform])
   @@index([status])
   @@index([soldAt])
@@ -299,6 +355,7 @@ model SalesOrderItem {
 
 model Expense {
   id          String   @id @default(cuid())
+  workspaceId String?  @map("workspace_id")
   category    String
   description String?
   amount      Decimal  @db.Decimal(12, 2)
@@ -307,7 +364,9 @@ model Expense {
   metadata    Json?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@index([category])
   @@index([spentAt])
   @@map("expenses")
@@ -315,6 +374,7 @@ model Expense {
 
 model Comment {
   id                String   @id @default(cuid())
+  workspaceId       String?  @map("workspace_id")
   postId            String?  @map("post_id")
   externalCommentId String?  @map("external_comment_id")
   author            String?
@@ -330,7 +390,9 @@ model Comment {
 
   post Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
   replies CommentReplyLog[]
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@index([postId])
   @@index([platform])
   @@index([isPurchaseIntent])
@@ -356,7 +418,8 @@ model CommentReplyLog {
 
 model PlatformAccount {
   id           String   @id @default(cuid())
-  platform     String   @unique
+  workspaceId  String?  @map("workspace_id")
+  platform     String
   accountName  String   @map("account_name")
   accountId    String?  @map("account_id")
   status       String   @default("disconnected")
@@ -369,7 +432,10 @@ model PlatformAccount {
   metadata     Json?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+  workspace    Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
+  @@unique([workspaceId, platform])
+  @@index([workspaceId])
   @@index([status])
   @@map("platform_accounts")
 }
@@ -392,6 +458,7 @@ model AutomationSetting {
 
 model Job {
   id           String   @id @default(cuid())
+  workspaceId  String?  @map("workspace_id")
   type         String
   status       String   @default("queued")
   title        String
@@ -406,7 +473,9 @@ model Job {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   completedAt  DateTime? @map("completed_at")
+  workspace     Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId])
   @@index([type])
   @@index([status])
   @@index([productId])

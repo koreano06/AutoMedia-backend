@@ -6,25 +6,25 @@ import { marketplaceListingPayloadSchema, marketplaceListingUpdateSchema } from 
 export async function registerMarketplaceListingsRoutes(app: FastifyInstance) {
   app.get("/", async (request) => {
     const query = request.query as { order?: string; limit?: string };
-    return marketplaceListingsService.list(query.order, query.limit ? Number(query.limit) : undefined);
+    return marketplaceListingsService.list(query.order, query.limit ? Number(query.limit) : undefined, request.user?.workspace_id);
   });
 
   app.post("/", async (request, reply) => {
-    return created(reply, await marketplaceListingsService.create(marketplaceListingPayloadSchema.parse(request.body)));
+    return created(reply, await marketplaceListingsService.create(marketplaceListingPayloadSchema.parse(request.body), request.user?.workspace_id));
   });
 
   app.post("/:id/publish-now", async (request) => {
     const { id } = request.params as { id: string };
-    return marketplaceListingsService.publishNow(id);
+    return marketplaceListingsService.publishNow(id, request.user?.workspace_id);
   });
 
   app.patch("/:id", async (request) => {
     const { id } = request.params as { id: string };
-    return marketplaceListingsService.update(id, marketplaceListingUpdateSchema.parse(request.body));
+    return marketplaceListingsService.update(id, marketplaceListingUpdateSchema.parse(request.body), request.user?.workspace_id);
   });
 
   app.delete("/:id", async (request) => {
     const { id } = request.params as { id: string };
-    return marketplaceListingsService.delete(id);
+    return marketplaceListingsService.delete(id, request.user?.workspace_id);
   });
 }

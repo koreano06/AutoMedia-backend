@@ -10,7 +10,8 @@ type UploadVideoInput = {
 };
 
 function publicSupabaseUrl(key: string) {
-  return `${env.SUPABASE_URL}/storage/v1/object/public/${env.SUPABASE_STORAGE_BUCKET}/${key}`;
+  const encodedKey = key.split("/").map(encodeURIComponent).join("/");
+  return `${env.SUPABASE_URL}/storage/v1/object/public/${env.SUPABASE_STORAGE_BUCKET}/${encodedKey}`;
 }
 
 async function uploadToSupabase(input: UploadVideoInput) {

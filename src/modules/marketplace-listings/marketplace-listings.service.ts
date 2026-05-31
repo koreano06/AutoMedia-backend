@@ -20,8 +20,9 @@ function accountCanPublish(account: Awaited<ReturnType<typeof platformsRepositor
   return true;
 }
 
-function listingPayloadFromProduct(product: Product, payload: Partial<MarketplaceListing>) {
+function listingPayloadFromProduct(product: Product, payload: Partial<MarketplaceListing>, workspaceId?: string) {
   return {
+    workspace_id: workspaceId,
     product_id: product.id,
     platform: payload.platform,
     title: payload.title || product.name,
@@ -43,34 +44,45 @@ function listingPayloadFromProduct(product: Product, payload: Partial<Marketplac
 }
 
 export const marketplaceListingsService = {
-  list(order = "-created_at", limit?: number) {
+  list(order = "-created_at", limit?: number, workspaceId?: string) {
+    if (workspaceId) return marketplaceListingsRepository.filter({ workspace_id: workspaceId }, order, limit);
     return marketplaceListingsRepository.list(order, limit);
   },
 
-  async create(payload: Partial<MarketplaceListing>) {
+  async create(payload: Partial<MarketplaceListing>, workspaceId?: string) {
     ensureMarketplace(payload.platform);
     if (!payload.product_id) throw new AppError("Produto obrigatório", 400, "PRODUCT_REQUIRED");
 
     const product = await productsRepository.findById(payload.product_id);
     if (!product) throw new AppError("Produto não encontrado", 404, "PRODUCT_NOT_FOUND");
+    if (workspaceId && product.workspace_id && product.workspace_id !== workspaceId) {
+      throw new AppError("Produto não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
+    }
 
-    return marketplaceListingsRepository.create(listingPayloadFromProduct(product, payload));
+    return marketplaceListingsRepository.create(listingPayloadFromProduct(product, payload, workspaceId || product.workspace_id));
   },
 
-  update(id: string, payload: Partial<MarketplaceListing>) {
+  async update(id: string, payload: Partial<MarketplaceListing>, workspaceId?: string) {
+    const listing = await marketplaceListingsRepository.findById(id);
+    if (!listing) throw new AppError("Anúncio não encontrado", 404, "MARKETPLACE_LISTING_NOT_FOUND");
+    if (workspaceId && listing.workspace_id && listing.workspace_id !== workspaceId) throw new AppError("Anúncio não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
     return marketplaceListingsRepository.update(id, payload);
   },
 
-  delete(id: string) {
+  async delete(id: string, workspaceId?: string) {
+    const listing = await marketplaceListingsRepository.findById(id);
+    if (!listing) throw new AppError("Anúncio não encontrado", 404, "MARKETPLACE_LISTING_NOT_FOUND");
+    if (workspaceId && listing.workspace_id && listing.workspace_id !== workspaceId) throw new AppError("Anúncio não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
     return marketplaceListingsRepository.delete(id);
   },
 
-  async publishNow(id: string) {
+  async publishNow(id: string, workspaceId?: string) {
     const listing = await marketplaceListingsRepository.findById(id);
     if (!listing) throw new AppError("Anúncio não encontrado", 404, "MARKETPLACE_LISTING_NOT_FOUND");
+    if (workspaceId && listing.workspace_id && listing.workspace_id !== workspaceId) throw new AppError("Anúncio não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
     ensureMarketplace(listing.platform);
 
-    const account = await platformsRepository.findByPlatform(String(listing.platform));
+    const account = await platformsRepository.findByPlatform(String(listing.platform), workspaceId || listing.workspace_id);
     if (!accountCanPublish(account)) {
       const failed = await marketplaceListingsRepository.update(id, {
         status: "failed",

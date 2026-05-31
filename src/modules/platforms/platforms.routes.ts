@@ -3,16 +3,16 @@ import { oauthCallbackSchema, platformParamSchema, publishPayloadSchema } from "
 import { platformsService } from "./platforms.service.js";
 
 export async function registerPlatformsRoutes(app: FastifyInstance) {
-  app.get("/accounts", async () => platformsService.listAccounts());
+  app.get("/accounts", async (request) => platformsService.listAccounts(request.user?.workspace_id));
 
   app.get("/:platform/connect-url", async (request) => {
     const { platform } = platformParamSchema.parse(request.params);
-    return platformsService.getConnectUrl(platform);
+    return platformsService.getConnectUrl(platform, request.user?.workspace_id);
   });
 
   app.post("/:platform/connect", async (request) => {
     const { platform } = platformParamSchema.parse(request.params);
-    return platformsService.connect(platform);
+    return platformsService.connect(platform, request.user?.workspace_id);
   });
 
   app.get("/:platform/callback", async (request, reply) => {
@@ -23,21 +23,21 @@ export async function registerPlatformsRoutes(app: FastifyInstance) {
 
   app.post("/:platform/disconnect", async (request) => {
     const { platform } = platformParamSchema.parse(request.params);
-    return platformsService.disconnect(platform);
+    return platformsService.disconnect(platform, request.user?.workspace_id);
   });
 
   app.post("/:platform/refresh-token", async (request) => {
     const { platform } = platformParamSchema.parse(request.params);
-    return platformsService.refresh(platform);
+    return platformsService.refresh(platform, request.user?.workspace_id);
   });
 
   app.post("/:platform/sync-account", async (request) => {
     const { platform } = platformParamSchema.parse(request.params);
-    return platformsService.syncAccount(platform);
+    return platformsService.syncAccount(platform, request.user?.workspace_id);
   });
 
   app.post("/:platform/publish", async (request) => {
     const { platform } = platformParamSchema.parse(request.params);
-    return platformsService.publish(platform, publishPayloadSchema.parse(request.body));
+    return platformsService.publish(platform, publishPayloadSchema.parse(request.body), request.user?.workspace_id);
   });
 }

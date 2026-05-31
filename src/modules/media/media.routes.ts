@@ -4,14 +4,14 @@ import { collectMediaSchema, mediaAssetPayloadSchema, mediaQuerySchema } from ".
 import { mediaService } from "./media.service.js";
 
 export async function registerMediaRoutes(app: FastifyInstance) {
-  app.get("/", async (request) => mediaService.list(mediaQuerySchema.parse(request.query)));
+  app.get("/", async (request) => mediaService.list({ ...mediaQuerySchema.parse(request.query), workspace_id: request.user?.workspace_id }));
 
-  app.post("/", async (request, reply) => created(reply, await mediaService.create(mediaAssetPayloadSchema.parse(request.body))));
+  app.post("/", async (request, reply) => created(reply, await mediaService.create(mediaAssetPayloadSchema.parse(request.body), request.user?.workspace_id)));
 
-  app.post("/collect", async (request, reply) => accepted(reply, await mediaService.collect(collectMediaSchema.parse(request.body))));
+  app.post("/collect", async (request, reply) => accepted(reply, await mediaService.collect(collectMediaSchema.parse(request.body), request.user?.workspace_id)));
 
   app.patch("/:id", async (request) => {
     const { id } = request.params as { id: string };
-    return mediaService.update(id, mediaAssetPayloadSchema.partial().parse(request.body));
+    return mediaService.update(id, mediaAssetPayloadSchema.partial().parse(request.body), request.user?.workspace_id);
   });
 }

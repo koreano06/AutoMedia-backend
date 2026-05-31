@@ -60,7 +60,7 @@ function buildRenderPlan(input: GenerateVideoInput, mediaUrls: string[], script:
 }
 
 export const videosService = {
-  async generate(payload: GenerateVideoInput) {
+  async generate(payload: GenerateVideoInput, workspaceId?: string) {
     const product = await productsRepository.findById(payload.product_id);
     if (!product) throw new AppError("Anúncio base não encontrado para geração de vídeo", 404, "AD_NOT_FOUND");
 
@@ -79,6 +79,7 @@ export const videosService = {
       type: "video_generation",
       status: "queued",
       title: `Gerar vídeo de divulgação ${payload.template || payload.style} - ${product.name}`,
+      workspace_id: workspaceId || product.workspace_id,
       product_id: product.id,
       progress: 0,
       payload: {
@@ -95,6 +96,7 @@ export const videosService = {
 
     const asset = await mediaRepository.create({
       product_id: product.id,
+      workspace_id: workspaceId || product.workspace_id,
       product_name: product.name,
       type: "generated_video",
       title: `Vídeo de divulgação ${payload.template || payload.style} - ${product.name}`,

@@ -6,25 +6,25 @@ import { postsService } from "./posts.service.js";
 export async function registerPostsRoutes(app: FastifyInstance) {
   app.get("/", async (request) => {
     const query = request.query as { order?: string; limit?: string };
-    return postsService.list(query.order, query.limit ? Number(query.limit) : undefined);
+    return postsService.list(query.order, query.limit ? Number(query.limit) : undefined, request.user?.workspace_id);
   });
 
-  app.post("/", async (request, reply) => created(reply, await postsService.create(postPayloadSchema.parse(request.body))));
+  app.post("/", async (request, reply) => created(reply, await postsService.create(postPayloadSchema.parse(request.body), request.user?.workspace_id)));
 
-  app.post("/schedule", async (request, reply) => created(reply, await postsService.schedule(schedulePostSchema.parse(request.body))));
+  app.post("/schedule", async (request, reply) => created(reply, await postsService.schedule(schedulePostSchema.parse(request.body), request.user?.workspace_id)));
 
   app.post("/:id/publish-now", async (request) => {
     const { id } = request.params as { id: string };
-    return postsService.publishNow(id);
+    return postsService.publishNow(id, request.user?.workspace_id);
   });
 
   app.patch("/:id", async (request) => {
     const { id } = request.params as { id: string };
-    return postsService.update(id, postPayloadSchema.partial().parse(request.body));
+    return postsService.update(id, postPayloadSchema.partial().parse(request.body), request.user?.workspace_id);
   });
 
   app.delete("/:id", async (request) => {
     const { id } = request.params as { id: string };
-    return postsService.delete(id);
+    return postsService.delete(id, request.user?.workspace_id);
   });
 }

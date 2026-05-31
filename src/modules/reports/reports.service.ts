@@ -6,9 +6,11 @@ function engagement(post: { engagement_likes?: number; engagement_comments?: num
 }
 
 export const reportsService = {
-  async overview() {
-    const posts = await postsRepository.list("-created_at", 1000);
-    const products = await productsRepository.list("-created_at", 1000);
+  async overview(workspaceId?: string) {
+    const [posts, products] = await Promise.all([
+      workspaceId ? postsRepository.filter({ workspace_id: workspaceId }, "-created_at", 1000) : postsRepository.list("-created_at", 1000),
+      workspaceId ? productsRepository.filter({ workspace_id: workspaceId }, "-created_at", 1000) : productsRepository.list("-created_at", 1000),
+    ]);
     const published = posts.filter((post) => post.status === "published");
     const reach = posts.reduce((sum, post) => sum + (post.engagement_reach || 0), 0);
     const interactions = posts.reduce((sum, post) => sum + engagement(post), 0);
@@ -24,8 +26,8 @@ export const reportsService = {
     };
   },
 
-  async platforms() {
-    const posts = await postsRepository.list("-created_at", 1000);
+  async platforms(workspaceId?: string) {
+    const posts = workspaceId ? await postsRepository.filter({ workspace_id: workspaceId }, "-created_at", 1000) : await postsRepository.list("-created_at", 1000);
     const platforms = [...new Set(posts.map((post) => post.platform).filter(Boolean))];
     return platforms.map((platform) => {
       const platformPosts = posts.filter((post) => post.platform === platform);

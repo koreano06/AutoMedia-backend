@@ -1,15 +1,17 @@
 import { Queue, type JobsOptions } from "bullmq";
 import { Redis } from "ioredis";
-import { queueConfig } from "../config/queue.js";
+import { queueConfig, requireQueueRedisUrl } from "../config/queue.js";
 
 let connection: InstanceType<typeof Redis> | undefined;
 const queues = new Map<string, Queue>();
 
 export function getQueueConnection(): InstanceType<typeof Redis> {
   if (!connection) {
-    connection = new Redis(queueConfig.redisUrl, {
+    connection = new Redis(requireQueueRedisUrl(), {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
+      connectionName: "automedia-bullmq",
+      ...(queueConfig.isTls ? { tls: {} } : {}),
     });
   }
 

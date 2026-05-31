@@ -12,12 +12,14 @@ function detectPurchaseIntent(content = "") {
 }
 
 export const commentsService = {
-  list(order = "-detected_at", limit?: number) {
+  list(order = "-detected_at", limit?: number, workspaceId?: string) {
+    if (workspaceId) return commentsRepository.filter({ workspace_id: workspaceId }, order, limit);
     return commentsRepository.list(order, limit);
   },
 
-  create(payload: Partial<Comment>) {
+  create(payload: Partial<Comment>, workspaceId?: string) {
     return commentsRepository.create({
+      workspace_id: workspaceId,
       detected_at: nowIso(),
       is_purchase_intent: payload.is_purchase_intent ?? detectPurchaseIntent(payload.content),
       auto_replied: false,

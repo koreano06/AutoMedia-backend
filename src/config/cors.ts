@@ -15,7 +15,9 @@ function uniqueOrigins(origins: string[]) {
 
 export const corsOptions = {
   origin: env.CORS_ORIGIN === "*"
-    ? true
+    ? env.NODE_ENV === "production"
+      ? uniqueOrigins([env.FRONTEND_URL])
+      : true
     : uniqueOrigins([
       ...env.CORS_ORIGIN.split(","),
       ...developmentOrigins,

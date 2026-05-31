@@ -4,5 +4,5 @@ import { generateVideoSchema } from "./videos.schemas.js";
 import { videosService } from "./videos.service.js";
 
 export async function registerVideosRoutes(app: FastifyInstance) {
-  app.post("/generate", async (request, reply) => accepted(reply, await videosService.generate(generateVideoSchema.parse(request.body))));
+  app.post("/generate", async (request, reply) => accepted(reply, await videosService.generate(generateVideoSchema.parse(request.body), request.user?.workspace_id)));
 }

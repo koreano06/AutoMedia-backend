@@ -1,4 +1,5 @@
 export const productFieldMap = {
+  workspace_id: "workspaceId",
   input_source: "inputSource",
   source_url: "sourceUrl",
   image_url: "imageUrl",
@@ -25,6 +26,7 @@ export const productFieldMap = {
 };
 
 export const mediaAssetFieldMap = {
+  workspace_id: "workspaceId",
   product_id: "productId",
   product_name: "productName",
   source_url: "sourceUrl",
@@ -45,6 +47,7 @@ export const mediaAssetFieldMap = {
 };
 
 export const postFieldMap = {
+  workspace_id: "workspaceId",
   product_id: "productId",
   media_asset_id: "mediaAssetId",
   product_name: "productName",
@@ -68,6 +71,7 @@ export const postFieldMap = {
 };
 
 export const marketplaceListingFieldMap = {
+  workspace_id: "workspaceId",
   product_id: "productId",
   stock_quantity: "stockQuantity",
   category_id: "categoryId",
@@ -84,6 +88,7 @@ export const marketplaceListingFieldMap = {
 };
 
 export const salesOrderFieldMap = {
+  workspace_id: "workspaceId",
   customer_name: "customerName",
   customer_email: "customerEmail",
   cost_total: "costTotal",
@@ -96,6 +101,7 @@ export const salesOrderFieldMap = {
 };
 
 export const expenseFieldMap = {
+  workspace_id: "workspaceId",
   spent_at: "spentAt",
   created_at: "createdAt",
   created_date: "createdAt",
@@ -104,6 +110,7 @@ export const expenseFieldMap = {
 };
 
 export const commentFieldMap = {
+  workspace_id: "workspaceId",
   post_id: "postId",
   external_comment_id: "externalCommentId",
   is_purchase_intent: "isPurchaseIntent",
@@ -118,6 +125,7 @@ export const commentFieldMap = {
 };
 
 export const jobFieldMap = {
+  workspace_id: "workspaceId",
   product_id: "productId",
   media_asset_id: "mediaAssetId",
   post_id: "postId",

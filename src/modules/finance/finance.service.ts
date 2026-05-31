@@ -1,6 +1,7 @@
 import { prisma } from "../../database/prisma.js";
 import type { Expense, SalesOrder } from "../../shared/types/domain.js";
 import { expensesRepository, salesOrdersRepository } from "./finance.repository.js";
+import { auditService } from "../audit/audit.service.js";
 
 type SalesOrderPayload = Omit<Partial<SalesOrder>, "items"> & {
   items: Array<{
@@ -30,19 +31,23 @@ function serializeOrder(order: Awaited<ReturnType<typeof prisma.salesOrder.creat
 }
 
 export const financeService = {
-  listOrders(order = "-sold_at", limit?: number) {
+  listOrders(order = "-sold_at", limit?: number, workspaceId?: string) {
+    if (workspaceId) return salesOrdersRepository.filter({ workspace_id: workspaceId }, order, limit);
     return salesOrdersRepository.list(order, limit);
   },
 
-  listExpenses(order = "-spent_at", limit?: number) {
+  listExpenses(order = "-spent_at", limit?: number, workspaceId?: string) {
+    if (workspaceId) return expensesRepository.filter({ workspace_id: workspaceId }, order, limit);
     return expensesRepository.list(order, limit);
   },
 
-  createExpense(payload: Partial<Expense>) {
-    return expensesRepository.create(payload);
+  async createExpense(payload: Partial<Expense>, actorId?: string, workspaceId?: string) {
+    const expense = await expensesRepository.create({ workspace_id: workspaceId, ...payload });
+    await auditService.log({ actor_id: actorId, action: "finance.expense.create", entity_type: "expense", entity_id: expense.id, after: expense });
+    return expense;
   },
 
-  async createOrder(payload: SalesOrderPayload) {
+  async createOrder(payload: SalesOrderPayload, actorId?: string, workspaceId?: string) {
     const items = payload.items || [];
     const subtotal = items.reduce((sum, item) => sum + asNumber(item.unit_price) * item.quantity, 0);
     const costTotal = items.reduce((sum, item) => sum + asNumber(item.unit_cost) * item.quantity, 0);
@@ -54,6 +59,7 @@ export const financeService = {
     const order = await prisma.salesOrder.create({
       data: {
         customerName: payload.customer_name,
+        workspaceId,
         customerEmail: payload.customer_email,
         platform: payload.platform,
         status: payload.status || "paid",
@@ -87,13 +93,15 @@ export const financeService = {
       include: { items: true },
     });
 
-    return serializeOrder(order);
+    const serialized = serializeOrder(order);
+    await auditService.log({ actor_id: actorId, action: "finance.order.create", entity_type: "sales_order", entity_id: order.id, after: serialized });
+    return serialized;
   },
 
-  async summary() {
+  async summary(workspaceId?: string) {
     const [orders, expenses] = await Promise.all([
-      prisma.salesOrder.findMany({ where: { status: { not: "cancelled" } } }),
-      prisma.expense.findMany(),
+      prisma.salesOrder.findMany({ where: { status: { not: "cancelled" }, ...(workspaceId ? { workspaceId } : {}) } }),
+      prisma.expense.findMany({ where: workspaceId ? { workspaceId } : undefined }),
     ]);
 
     const revenue = orders.reduce((sum, order) => sum + asNumber(order.total.toString()), 0);

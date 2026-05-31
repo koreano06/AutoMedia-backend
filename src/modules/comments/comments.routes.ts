@@ -6,10 +6,10 @@ import { commentsService } from "./comments.service.js";
 export async function registerCommentsRoutes(app: FastifyInstance) {
   app.get("/", async (request) => {
     const query = request.query as { order?: string; limit?: string };
-    return commentsService.list(query.order, query.limit ? Number(query.limit) : undefined);
+    return commentsService.list(query.order, query.limit ? Number(query.limit) : undefined, request.user?.workspace_id);
   });
 
-  app.post("/", async (request, reply) => created(reply, await commentsService.create(commentPayloadSchema.parse(request.body))));
+  app.post("/", async (request, reply) => created(reply, await commentsService.create(commentPayloadSchema.parse(request.body), request.user?.workspace_id)));
 
   app.post("/auto-reply", async (request) => commentsService.autoReply(autoReplySchema.parse(request.body)));
 

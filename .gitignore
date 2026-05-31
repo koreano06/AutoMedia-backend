@@ -5,6 +5,8 @@ dist
 !.env.example
 uploads/*
 !uploads/.gitkeep
+backups/*
+!backups/.gitkeep
 *.log
 npm-debug.log*
 pnpm-debug.log*

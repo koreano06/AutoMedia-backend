@@ -38,6 +38,7 @@ export type JobStatus = "queued" | "processing" | "rendering" | "uploading" | "c
 
 export type Product = {
   id: EntityId;
+  workspace_id?: EntityId;
   name: string;
   input_source?: ProductInputSource;
   source_url?: string;
@@ -73,6 +74,7 @@ export type Product = {
 
 export type MediaAsset = {
   id: EntityId;
+  workspace_id?: EntityId;
   product_id?: EntityId;
   product_name?: string;
   type?: MediaAssetType | string;
@@ -102,6 +104,7 @@ export type MediaAsset = {
 
 export type Post = {
   id: EntityId;
+  workspace_id?: EntityId;
   product_id?: EntityId;
   media_asset_id?: EntityId;
   product_name?: string;
@@ -127,6 +130,7 @@ export type Post = {
 
 export type MarketplaceListing = {
   id: EntityId;
+  workspace_id?: EntityId;
   product_id: EntityId;
   platform: Platform;
   title: string;
@@ -166,6 +170,7 @@ export type SalesOrderItem = {
 
 export type SalesOrder = {
   id: EntityId;
+  workspace_id?: EntityId;
   customer_name?: string;
   customer_email?: string;
   platform?: Platform;
@@ -187,6 +192,7 @@ export type SalesOrder = {
 
 export type Expense = {
   id: EntityId;
+  workspace_id?: EntityId;
   category: string;
   description?: string;
   amount: number | string;
@@ -199,6 +205,7 @@ export type Expense = {
 
 export type Comment = {
   id: EntityId;
+  workspace_id?: EntityId;
   post_id?: EntityId;
   external_comment_id?: string;
   author?: string;
@@ -213,6 +220,7 @@ export type Comment = {
 
 export type PlatformAccount = {
   id: EntityId;
+  workspace_id?: EntityId;
   platform: Platform;
   account_name: string;
   account_id?: string;
@@ -242,6 +250,7 @@ export type AutomationSettings = {
 
 export type Job = {
   id: EntityId;
+  workspace_id?: EntityId;
   type: JobType;
   status: JobStatus;
   title: string;

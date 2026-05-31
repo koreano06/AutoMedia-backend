@@ -11,3 +11,11 @@ export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
 });
+
+export const refreshTokenSchema = z.object({
+  refresh_token: z.string().min(20),
+});
+
+export const logoutSchema = z.object({
+  refresh_token: z.string().min(20).optional(),
+});

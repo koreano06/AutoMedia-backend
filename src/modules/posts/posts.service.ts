@@ -12,28 +12,37 @@ function randomScheduleDate() {
 }
 
 export const postsService = {
-  list(order = "-created_at", limit?: number) {
+  list(order = "-created_at", limit?: number, workspaceId?: string) {
+    if (workspaceId) return postsRepository.filter({ workspace_id: workspaceId }, order, limit);
     return postsRepository.list(order, limit);
   },
 
-  create(payload: Partial<Post>) {
-    return postsRepository.create({ status: payload.status || "scheduled", ...payload });
+  create(payload: Partial<Post>, workspaceId?: string) {
+    return postsRepository.create({ status: payload.status || "scheduled", workspace_id: workspaceId, ...payload });
   },
 
-  update(id: string, payload: Partial<Post>) {
+  async update(id: string, payload: Partial<Post>, workspaceId?: string) {
+    const post = await postsRepository.findById(id);
+    if (!post) throw new AppError("Post não encontrado", 404, "POST_NOT_FOUND");
+    if (workspaceId && post.workspace_id && post.workspace_id !== workspaceId) throw new AppError("Post não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
     return postsRepository.update(id, payload);
   },
 
-  delete(id: string) {
+  async delete(id: string, workspaceId?: string) {
+    const post = await postsRepository.findById(id);
+    if (!post) throw new AppError("Post não encontrado", 404, "POST_NOT_FOUND");
+    if (workspaceId && post.workspace_id && post.workspace_id !== workspaceId) throw new AppError("Post não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
     return postsRepository.delete(id);
   },
 
-  async schedule(payload: { media_asset_id: string; platforms: string[]; caption: string; schedule_mode: "now" | "scheduled" | "random_window"; scheduled_at?: string }) {
+  async schedule(payload: { media_asset_id: string; platforms: string[]; caption: string; schedule_mode: "now" | "scheduled" | "random_window"; scheduled_at?: string }, workspaceId?: string) {
     const asset = await mediaRepository.findById(payload.media_asset_id);
     if (!asset) throw new AppError("Mídia não encontrada para agendamento", 404, "MEDIA_NOT_FOUND");
+    if (workspaceId && asset.workspace_id && asset.workspace_id !== workspaceId) throw new AppError("Mídia não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
 
     return Promise.all(payload.platforms.map((platform) => postsRepository.create({
       media_asset_id: asset.id,
+      workspace_id: workspaceId || asset.workspace_id,
       product_id: asset.product_id,
       product_name: asset.product_name,
       platform,
@@ -49,9 +58,10 @@ export const postsService = {
     })));
   },
 
-  async publishNow(id: string) {
+  async publishNow(id: string, workspaceId?: string) {
     const post = await postsRepository.findById(id);
     if (!post) throw new AppError("Post não encontrado", 404, "POST_NOT_FOUND");
+    if (workspaceId && post.workspace_id && post.workspace_id !== workspaceId) throw new AppError("Post não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
     if (!post.platform) throw new AppError("Post sem plataforma definida", 400, "POST_PLATFORM_MISSING");
 
     const result = await platformsService.publish(post.platform, {
@@ -61,7 +71,7 @@ export const postsService = {
       title: post.product_name,
       caption: post.caption || "",
       media_url: post.thumbnail_url,
-    });
+    }, workspaceId || post.workspace_id);
 
     return postsRepository.update(id, {
       status: result.status,
