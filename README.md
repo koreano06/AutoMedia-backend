@@ -20,60 +20,60 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 
 ## Status das Funcionalidades
 
-✅ Backend com Fastify e TypeScript
-✅ Banco PostgreSQL com Prisma
-✅ Schema para produtos, mídias, jobs, posts, comentários e comercial
-✅ Autenticação local/JWT
-✅ Login público na Vercel corrigido e validado
-✅ Seeds para teste da plataforma
-✅ Fila BullMQ com Redis
-✅ Worker FFmpeg para renderização de vídeos
-✅ Storage local e suporte a Supabase Storage
-✅ API de geração de imagens com OpenAI Images
-✅ Integrações sociais em modo `mock`
-✅ Rotas privadas protegidas por JWT
-✅ Rate limit e headers de segurança no backend
-✅ Tokens sociais criptografados no banco
-✅ Auditoria básica para login, integrações e publicação
-✅ Diagnóstico interno de banco, Redis, storage e OpenAI
-✅ Refresh token com rotação e revogação no banco
-✅ Validação forte de upload de imagem por MIME/tamanho
-✅ Permissões por papel em rotas sensíveis
-✅ Bloqueio temporário contra brute force no login
-✅ Scripts de migração segura, verificação de banco, backfill de workspace e rotação de secrets
-✅ Testes de segurança para autenticação, permissão e assinatura de webhook
-🟡 OpenAI em validação para fluxo profissional de criativos
-🟡 Supabase Storage em configuração para produção
-🟡 Redis gerenciado em produção ainda pendente de definição final
-🟡 Worker de vídeo precisa rodar fora da Vercel em ambiente contínuo
-🔜 Publicação real em redes sociais
-🔜 Integração live com Shopee, Mercado Livre, TikTok e Meta
-🔜 Webhooks/polling para comentários e respostas automáticas
+- ✅ Backend com Fastify e TypeScript
+- ✅ Banco PostgreSQL com Prisma
+- ✅ Schema para produtos, mídias, jobs, posts, comentários e comercial
+- ✅ Autenticação local/JWT
+- ✅ Login público na Vercel corrigido e validado
+- ✅ Seeds para teste da plataforma
+- ✅ Fila BullMQ com Redis
+- ✅ Worker FFmpeg para renderização de vídeos
+- ✅ Storage local e suporte a Supabase Storage
+- ✅ API de geração de imagens com OpenAI Images
+- ✅ Integrações sociais em modo `mock`
+- ✅ Rotas privadas protegidas por JWT
+- ✅ Rate limit e headers de segurança no backend
+- ✅ Tokens sociais criptografados no banco
+- ✅ Auditoria básica para login, integrações e publicação
+- ✅ Diagnóstico interno de banco, Redis, storage e OpenAI
+- ✅ Refresh token com rotação e revogação no banco
+- ✅ Validação forte de upload de imagem por MIME/tamanho
+- ✅ Permissões por papel em rotas sensíveis
+- ✅ Bloqueio temporário contra brute force no login
+- ✅ Scripts de migração segura, verificação de banco, backfill de workspace e rotação de secrets
+- ✅ Testes de segurança para autenticação, permissão e assinatura de webhook
+- 🟡 OpenAI em validação para fluxo profissional de criativos
+- 🟡 Supabase Storage em configuração para produção
+- 🟡 Redis gerenciado em produção ainda pendente de definição final
+- 🟡 Worker de vídeo precisa rodar fora da Vercel em ambiente contínuo
+- 🔜 Publicação real em redes sociais
+- 🔜 Integração live com Shopee, Mercado Livre, TikTok e Meta
+- 🔜 Webhooks/polling para comentários e respostas automáticas
 
 ## Plano de Estabilização
 
-✅ 1. Consolidar ambiente de produção
-🟡 2. Fechar Redis + Supabase Storage
-🔜 3. Melhorar acompanhamento em tempo real dos jobs
-✅ 4. Fortalecer autenticação e sessão
-🔜 5. Revisar CRUDs ponta a ponta
-🔜 6. Implementar integrações sociais live
+- ✅ 1. Consolidar ambiente de produção
+- 🟡 2. Fechar Redis + Supabase Storage
+- 🔜 3. Melhorar acompanhamento em tempo real dos jobs
+- ✅ 4. Fortalecer autenticação e sessão
+- 🔜 5. Revisar CRUDs ponta a ponta
+- 🔜 6. Implementar integrações sociais live
 
 ## Plano de Segurança
 
-✅ 1. JWT real no backend e rotas privadas protegidas
-✅ 2. Escopo por usuário/empresa com `workspace_id` nas entidades principais e backfill aplicado
-✅ 3. Criptografia de tokens sociais no banco
-✅ 4. Validação forte de upload e limites por tipo/tamanho
-✅ 5. Auditoria para ações críticas
-✅ 6. Assinatura/validação de webhooks externos
-✅ 7. Rotação e checklist de secrets em produção
-✅ 8. Diagnóstico interno protegido
-✅ 9. Refresh token com rotação de sessão
-✅ 10. Permissões por papel em rotas sensíveis
-✅ 11. Bloqueio por tentativas repetidas de login
-✅ 12. Sanitização de dados sensíveis em auditoria
-✅ 13. Verificação de schema de segurança no banco
+- ✅ 1. JWT real no backend e rotas privadas protegidas
+- ✅ 2. Escopo por usuário/empresa com `workspace_id` nas entidades principais e backfill aplicado
+- ✅ 3. Criptografia de tokens sociais no banco
+- ✅ 4. Validação forte de upload e limites por tipo/tamanho
+- ✅ 5. Auditoria para ações críticas
+- ✅ 6. Assinatura/validação de webhooks externos
+- ✅ 7. Rotação e checklist de secrets em produção
+- ✅ 8. Diagnóstico interno protegido
+- ✅ 9. Refresh token com rotação de sessão
+- ✅ 10. Permissões por papel em rotas sensíveis
+- ✅ 11. Bloqueio por tentativas repetidas de login
+- ✅ 12. Sanitização de dados sensíveis em auditoria
+- ✅ 13. Verificação de schema de segurança no banco
 
 Camada atual:
 
@@ -323,13 +323,13 @@ Fluxo atual:
 
 Situação atual do fluxo:
 
-✅ Contrato frontend -> backend preparado
-✅ Criação de job e mídia inicial preparada
-✅ Worker FFmpeg implementado
-🟡 Execução contínua do worker ainda precisa de hospedagem própria fora da Vercel
-🟡 Storage persistente com Supabase ainda precisa ser ativado em produção
-🟡 Feedback granular do job no frontend ainda está em evolução
-🔜 Publicação social real após aprovação
+- ✅ Contrato frontend -> backend preparado
+- ✅ Criação de job e mídia inicial preparada
+- ✅ Worker FFmpeg implementado
+- 🟡 Execução contínua do worker ainda precisa de hospedagem própria fora da Vercel
+- 🟡 Storage persistente com Supabase ainda precisa ser ativado em produção
+- 🟡 Feedback granular do job no frontend ainda está em evolução
+- 🔜 Publicação social real após aprovação
 
 Estados principais do job:
 
