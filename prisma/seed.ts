@@ -1,6 +1,9 @@
-import "dotenv/config";
 import bcrypt from "bcryptjs";
+import { config } from "dotenv";
 import { PrismaClient } from "@prisma/client";
+
+config({ path: ".env.local" });
+config();
 
 const prisma = new PrismaClient();
 
@@ -80,7 +83,12 @@ async function main() {
 
   await prisma.user.upsert({
     where: { username: "admin" },
-    update: { workspaceId: workspace.id },
+    update: {
+      passwordHash,
+      role: "admin",
+      storeName: "AutoMedia",
+      workspaceId: workspace.id,
+    },
     create: {
       name: "Administrador",
       username: "admin",
