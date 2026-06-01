@@ -15,6 +15,8 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - Integração OpenAI Images API para criativos visuais.
 - Integrações sociais com modo `mock` e preparação para modo `live`.
 - Deploy da API preparado para Vercel.
+- Login em produção validado em `POST /api/auth/login`.
+- Usuário de teste garantido pelo seed: `admin / admin123`.
 
 ## Status das Funcionalidades
 
@@ -22,6 +24,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 ✅ Banco PostgreSQL com Prisma
 ✅ Schema para produtos, mídias, jobs, posts, comentários e comercial
 ✅ Autenticação local/JWT
+✅ Login público na Vercel corrigido e validado
 ✅ Seeds para teste da plataforma
 ✅ Fila BullMQ com Redis
 ✅ Worker FFmpeg para renderização de vídeos
@@ -41,6 +44,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 ✅ Testes de segurança para autenticação, permissão e assinatura de webhook
 🟡 OpenAI em validação para fluxo profissional de criativos
 🟡 Supabase Storage em configuração para produção
+🟡 Redis gerenciado em produção ainda pendente de definição final
 🟡 Worker de vídeo precisa rodar fora da Vercel em ambiente contínuo
 🔜 Publicação real em redes sociais
 🔜 Integração live com Shopee, Mercado Livre, TikTok e Meta
@@ -49,7 +53,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 ## Plano de Estabilização
 
 ✅ 1. Consolidar ambiente de produção
-✅ 2. Fechar Redis + Supabase Storage
+🟡 2. Fechar Redis + Supabase Storage
 🔜 3. Melhorar acompanhamento em tempo real dos jobs
 ✅ 4. Fortalecer autenticação e sessão
 🔜 5. Revisar CRUDs ponta a ponta
@@ -74,6 +78,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 Camada atual:
 
 - `POST /api/auth/login` é rota pública com rate limit mais restrito.
+- `POST /api/auth/login` foi validada em produção com o usuário de teste `admin / admin123`.
 - Rotas privadas exigem `Authorization: Bearer <token>`.
 - `GET /api/health`, `GET /api/meta/routes` e callback OAuth continuam públicos.
 - Tokens JWT usam `issuer` e `audience`.
@@ -186,6 +191,13 @@ API_PUBLIC_URL="http://localhost:3333"
 npm run db:generate
 npm run db:push
 npm run db:seed
+```
+
+O seed cria/atualiza o usuário inicial:
+
+```text
+usuario: admin
+senha: admin123
 ```
 
 5. Inicie a API:
@@ -308,6 +320,16 @@ Fluxo atual:
 6. Worker envia o arquivo para storage local ou Supabase.
 7. Mídia final vira `pending_review`.
 8. Usuário aprova e agenda pelo frontend.
+
+Situação atual do fluxo:
+
+✅ Contrato frontend -> backend preparado
+✅ Criação de job e mídia inicial preparada
+✅ Worker FFmpeg implementado
+🟡 Execução contínua do worker ainda precisa de hospedagem própria fora da Vercel
+🟡 Storage persistente com Supabase ainda precisa ser ativado em produção
+🟡 Feedback granular do job no frontend ainda está em evolução
+🔜 Publicação social real após aprovação
 
 Estados principais do job:
 
