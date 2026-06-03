@@ -42,6 +42,8 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Bloqueio temporário contra brute force no login
 - ✅ Scripts de migração segura, verificação de banco, backfill de workspace e rotação de secrets
 - ✅ Testes de segurança para autenticação, permissão e assinatura de webhook
+- ✅ Testes de services para comments, jobs e posts
+- ✅ Smoke test CRUD para validar API real de ponta a ponta
 - 🟡 OpenAI em validação para fluxo profissional de criativos
 - 🟡 Supabase Storage em configuração para produção
 - 🟡 Redis gerenciado em produção ainda pendente de definição final
@@ -56,7 +58,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - 🟡 2. Fechar Redis + Supabase Storage
 - 🔜 3. Melhorar acompanhamento em tempo real dos jobs
 - ✅ 4. Fortalecer autenticação e sessão
-- 🔜 5. Revisar CRUDs ponta a ponta
+- ✅ 5. Revisar CRUDs ponta a ponta
 - 🔜 6. Implementar integrações sociais live
 
 ## Plano de Segurança
@@ -220,10 +222,32 @@ npm run build        # Prisma generate + TypeScript build
 npm run start        # executa dist/src/server.js
 npm run typecheck    # valida TypeScript sem emitir arquivos
 npm run test         # testes com Vitest
+npm run crud:check   # smoke test CRUD contra API real
 npm run worker:video # worker BullMQ de renderização de vídeo
 npm run prod:check   # valida variáveis essenciais de produção
 npm run infra:check  # valida Redis e Supabase Storage
 ```
+
+## Testes e Qualidade
+
+Validação recomendada antes de deploy:
+
+```bash
+npm run typecheck
+npm test
+npm run build
+```
+
+Smoke test contra uma API publicada:
+
+```bash
+$env:CRUD_CHECK_API_URL="https://auto-media-backend.vercel.app/api"
+$env:CRUD_CHECK_USERNAME="admin"
+$env:CRUD_CHECK_PASSWORD="admin123"
+npm run crud:check
+```
+
+Esse smoke cria, atualiza e remove registros temporários para validar o contrato real de produtos, comentários, posts e jobs.
 
 Banco:
 

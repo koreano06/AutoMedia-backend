@@ -11,10 +11,15 @@ export async function registerCommentsRoutes(app: FastifyInstance) {
 
   app.post("/", async (request, reply) => created(reply, await commentsService.create(commentPayloadSchema.parse(request.body), request.user?.workspace_id)));
 
-  app.post("/auto-reply", async (request) => commentsService.autoReply(autoReplySchema.parse(request.body)));
+  app.post("/auto-reply", async (request) => commentsService.autoReply(autoReplySchema.parse(request.body), request.user?.workspace_id));
 
   app.patch("/:id", async (request) => {
     const { id } = request.params as { id: string };
-    return commentsService.update(id, commentPayloadSchema.partial().parse(request.body));
+    return commentsService.update(id, commentPayloadSchema.partial().parse(request.body), request.user?.workspace_id);
+  });
+
+  app.delete("/:id", async (request) => {
+    const { id } = request.params as { id: string };
+    return commentsService.delete(id, request.user?.workspace_id);
   });
 }

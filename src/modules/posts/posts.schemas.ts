@@ -27,3 +27,8 @@ export const schedulePostSchema = z.object({
   schedule_mode: z.enum(["now", "scheduled", "random_window"]).default("random_window"),
   scheduled_at: z.string().optional(),
 });
+
+export const publishDuePostsSchema = z.object({
+  limit: z.number().int().min(1).max(100).default(25),
+  dry_run: z.boolean().default(false),
+});

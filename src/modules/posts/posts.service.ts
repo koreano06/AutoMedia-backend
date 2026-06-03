@@ -4,6 +4,7 @@ import { AppError } from "../../shared/errors/AppError.js";
 import { nowIso } from "../../shared/utils/dates.js";
 import type { Post } from "../../shared/types/domain.js";
 import { platformsService } from "../platforms/platforms.service.js";
+import { prisma } from "../../database/prisma.js";
 
 function randomScheduleDate() {
   const date = new Date();
@@ -82,5 +83,73 @@ export const postsService = {
       retry_count: (post.retry_count || 0) + 1,
       last_sync_at: nowIso(),
     });
+  },
+
+  async publishDue(payload: { limit?: number; dry_run?: boolean } = {}, workspaceId?: string) {
+    const limit = Math.min(Math.max(payload.limit || 25, 1), 100);
+    const duePosts = await prisma.post.findMany({
+      where: {
+        status: "scheduled",
+        scheduledAt: { lte: new Date() },
+        ...(workspaceId ? { workspaceId } : {}),
+      },
+      orderBy: { scheduledAt: "asc" },
+      take: limit,
+    });
+
+    if (payload.dry_run) {
+      return {
+        dry_run: true,
+        total: duePosts.length,
+        posts: duePosts.map((post) => ({
+          id: post.id,
+          platform: post.platform,
+          product_name: post.productName,
+          scheduled_at: post.scheduledAt?.toISOString(),
+        })),
+      };
+    }
+
+    const results = [];
+
+    for (const post of duePosts) {
+      try {
+        await postsRepository.update(post.id, {
+          status: "publishing",
+          last_sync_at: nowIso(),
+        });
+
+        const published = await this.publishNow(post.id, workspaceId || post.workspaceId || undefined);
+        results.push({
+          id: post.id,
+          platform: post.platform,
+          status: published.status,
+          external_post_id: published.external_post_id,
+          external_url: published.external_url,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha ao publicar post agendado";
+        await postsRepository.update(post.id, {
+          status: "failed",
+          error_message: message,
+          retry_count: post.retryCount + 1,
+          last_sync_at: nowIso(),
+        });
+        results.push({
+          id: post.id,
+          platform: post.platform,
+          status: "failed",
+          error_message: message,
+        });
+      }
+    }
+
+    return {
+      dry_run: false,
+      total: duePosts.length,
+      published: results.filter((item) => item.status === "published" || item.status === "publishing").length,
+      failed: results.filter((item) => item.status === "failed").length,
+      results,
+    };
   },
 };

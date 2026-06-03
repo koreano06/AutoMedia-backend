@@ -8,13 +8,18 @@ export async function registerJobsRoutes(app: FastifyInstance) {
 
   app.get("/:id", async (request) => {
     const { id } = request.params as { id: string };
-    return jobsService.get(id);
+    return jobsService.get(id, request.user?.workspace_id);
   });
 
   app.post("/", async (request, reply) => created(reply, await jobsService.create(createJobSchema.parse(request.body), request.user?.workspace_id)));
 
   app.patch("/:id", async (request) => {
     const { id } = request.params as { id: string };
-    return jobsService.update(id, updateJobSchema.parse(request.body));
+    return jobsService.update(id, updateJobSchema.parse(request.body), request.user?.workspace_id);
+  });
+
+  app.delete("/:id", async (request) => {
+    const { id } = request.params as { id: string };
+    return jobsService.delete(id, request.user?.workspace_id);
   });
 }

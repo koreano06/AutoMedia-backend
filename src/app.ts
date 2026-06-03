@@ -115,11 +115,11 @@ export function buildApp() {
       return { asset };
     });
     api.post("/comment-auto-reply", async (request) => {
-      return commentsService.autoReply(request.body as { comment_id: string; product_id?: string; reply_template: string });
+      return commentsService.autoReply(request.body as { comment_id: string; product_id?: string; reply_template: string }, request.user?.workspace_id);
     });
     api.post("/comment-update", async (request) => {
       const { id, ...payload } = request.body as { id: string; [key: string]: unknown };
-      return commentsService.update(id, payload);
+      return commentsService.update(id, payload, request.user?.workspace_id);
     });
     api.post("/platform-connect", async (request) => {
       assertAdmin(request);
@@ -164,6 +164,10 @@ export function buildApp() {
       assertAdmin(request);
       const { id } = request.body as { id: string };
       return postsService.publishNow(id, request.user?.workspace_id);
+    });
+    api.post("/post-publish-due", async (request) => {
+      assertAdmin(request);
+      return postsService.publishDue(request.body as { limit?: number; dry_run?: boolean }, request.user?.workspace_id);
     });
     api.post("/post-update", async (request) => {
       const { id, ...payload } = request.body as { id: string; [key: string]: unknown };

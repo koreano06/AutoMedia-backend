@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { created } from "../../shared/http/reply.js";
-import { postPayloadSchema, schedulePostSchema } from "./posts.schemas.js";
+import { requireRole } from "../../shared/middlewares/auth.middleware.js";
+import { postPayloadSchema, publishDuePostsSchema, schedulePostSchema } from "./posts.schemas.js";
 import { postsService } from "./posts.service.js";
 
 export async function registerPostsRoutes(app: FastifyInstance) {
@@ -13,7 +14,11 @@ export async function registerPostsRoutes(app: FastifyInstance) {
 
   app.post("/schedule", async (request, reply) => created(reply, await postsService.schedule(schedulePostSchema.parse(request.body), request.user?.workspace_id)));
 
-  app.post("/:id/publish-now", async (request) => {
+  app.post("/publish-due", { preHandler: requireRole(["admin"]) }, async (request) => {
+    return postsService.publishDue(publishDuePostsSchema.parse(request.body || {}), request.user?.workspace_id);
+  });
+
+  app.post("/:id/publish-now", { preHandler: requireRole(["admin"]) }, async (request) => {
     const { id } = request.params as { id: string };
     return postsService.publishNow(id, request.user?.workspace_id);
   });

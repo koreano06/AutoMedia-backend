@@ -27,14 +27,26 @@ export const commentsService = {
     });
   },
 
-  update(id: string, payload: Partial<Comment>) {
+  async update(id: string, payload: Partial<Comment>, workspaceId?: string) {
+    const comment = await commentsRepository.findById(id);
+    if (!comment) throw new AppError("Comentário não encontrado", 404, "COMMENT_NOT_FOUND");
+    if (workspaceId && comment.workspace_id && comment.workspace_id !== workspaceId) throw new AppError("Comentário não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
     return commentsRepository.update(id, payload);
   },
 
-  async autoReply(payload: { comment_id: string; product_id?: string; reply_template: string }) {
+  async delete(id: string, workspaceId?: string) {
+    const comment = await commentsRepository.findById(id);
+    if (!comment) throw new AppError("Comentário não encontrado", 404, "COMMENT_NOT_FOUND");
+    if (workspaceId && comment.workspace_id && comment.workspace_id !== workspaceId) throw new AppError("Comentário não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
+    return commentsRepository.delete(id);
+  },
+
+  async autoReply(payload: { comment_id: string; product_id?: string; reply_template: string }, workspaceId?: string) {
     const comment = await commentsRepository.findById(payload.comment_id);
     if (!comment) throw new AppError("Comentário não encontrado", 404, "COMMENT_NOT_FOUND");
+    if (workspaceId && comment.workspace_id && comment.workspace_id !== workspaceId) throw new AppError("Comentário não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
     const product = payload.product_id ? await productsRepository.findById(payload.product_id) : null;
+    if (workspaceId && product?.workspace_id && product.workspace_id !== workspaceId) throw new AppError("Produto não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
     const productUrl = product?.affiliate_url || product?.product_url || product?.source_url || "link indisponível";
     const reply = payload.reply_template.replace("{{product_url}}", productUrl);
 
