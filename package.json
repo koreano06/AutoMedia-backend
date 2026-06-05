@@ -23,6 +23,7 @@
     "prod:check": "node scripts/check-production-env.mjs",
     "infra:check": "node scripts/check-infrastructure.mjs",
     "secrets:rotate:checklist": "node scripts/rotate-secrets-checklist.mjs",
+    "check:errors": "node scripts/report-errors-only.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

@@ -223,6 +223,7 @@ npm run start        # executa dist/src/server.js
 npm run typecheck    # valida TypeScript sem emitir arquivos
 npm run test         # testes com Vitest
 npm run crud:check   # smoke test CRUD contra API real
+npm run check:errors # roda validações e mostra apenas erros
 npm run worker:video # worker BullMQ de renderização de vídeo
 npm run prod:check   # valida variáveis essenciais de produção
 npm run infra:check  # valida Redis e Supabase Storage
@@ -236,6 +237,18 @@ Validação recomendada antes de deploy:
 npm run typecheck
 npm test
 npm run build
+```
+
+Para uma saída limpa que mostra somente falhas:
+
+```bash
+npm run --silent check:errors
+```
+
+Para incluir o smoke CRUD contra API real:
+
+```powershell
+$env:RUN_SMOKE="true"; npm run --silent check:errors; Remove-Item Env:RUN_SMOKE
 ```
 
 Smoke test contra uma API publicada:
