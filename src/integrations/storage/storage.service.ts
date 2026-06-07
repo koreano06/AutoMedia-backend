@@ -1,5 +1,6 @@
 import { mkdir, readFile, copyFile } from "node:fs/promises";
 import path from "node:path";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { env } from "../../config/env.js";
 import { AppError } from "../../shared/errors/AppError.js";
 
@@ -12,6 +13,47 @@ type UploadVideoInput = {
 function publicSupabaseUrl(key: string) {
   const encodedKey = key.split("/").map(encodeURIComponent).join("/");
   return `${env.SUPABASE_URL}/storage/v1/object/public/${env.SUPABASE_STORAGE_BUCKET}/${encodedKey}`;
+}
+
+function publicS3Url(key: string) {
+  const encodedKey = key.split("/").map(encodeURIComponent).join("/");
+  const baseUrl = (env.S3_PUBLIC_URL || env.S3_ENDPOINT || "").replace(/\/$/, "");
+  return `${baseUrl}/${env.S3_BUCKET}/${encodedKey}`;
+}
+
+function createS3Client() {
+  if (!env.S3_ENDPOINT || !env.S3_BUCKET || !env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) {
+    throw new AppError("S3/MinIO não configurado para upload de vídeo", 409, "S3_STORAGE_NOT_CONFIGURED");
+  }
+
+  return new S3Client({
+    endpoint: env.S3_ENDPOINT,
+    forcePathStyle: env.S3_FORCE_PATH_STYLE,
+    region: env.S3_REGION,
+    credentials: {
+      accessKeyId: env.S3_ACCESS_KEY_ID,
+      secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+    },
+  });
+}
+
+async function uploadToS3(input: UploadVideoInput) {
+  const file = await readFile(input.localPath);
+  const key = input.key.replace(/^\/+/, "");
+  const client = createS3Client();
+
+  await client.send(new PutObjectCommand({
+    Bucket: env.S3_BUCKET,
+    Key: key,
+    Body: file,
+    ContentType: input.contentType || "video/mp4",
+  }));
+
+  return {
+    url: publicS3Url(key),
+    storage_key: key,
+    provider: "s3",
+  };
 }
 
 async function uploadToSupabase(input: UploadVideoInput) {
@@ -59,6 +101,10 @@ async function uploadToLocal(input: UploadVideoInput) {
 
 export const storageService = {
   async uploadVideo(input: UploadVideoInput) {
+    if (env.STORAGE_DRIVER === "s3") {
+      return uploadToS3(input);
+    }
+
     if (env.STORAGE_DRIVER === "supabase") {
       return uploadToSupabase(input);
     }

@@ -66,6 +66,11 @@ async function checkRedis() {
 }
 
 function checkStorage() {
+  if (env.STORAGE_DRIVER === "s3") {
+    const configured = Boolean(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY);
+    return { status: configured ? "ok" : "warning", driver: env.STORAGE_DRIVER, bucket: env.S3_BUCKET || null };
+  }
+
   if (env.STORAGE_DRIVER === "supabase") {
     const configured = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.SUPABASE_STORAGE_BUCKET);
     return { status: configured ? "ok" : "warning", driver: env.STORAGE_DRIVER, bucket: env.SUPABASE_STORAGE_BUCKET };
@@ -129,6 +134,18 @@ async function runDatabaseWriteCheck(user?: DiagnosticUser) {
 
 async function runStorageCheck() {
   return timedCheck("storage", "Storage", async () => {
+    if (env.STORAGE_DRIVER === "s3") {
+      const configured = Boolean(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY);
+      return {
+        status: configured ? "ok" : "warning",
+        message: configured ? "S3/MinIO configurado para storage persistente." : "S3/MinIO selecionado, mas variáveis obrigatórias estão incompletas.",
+        metadata: {
+          driver: env.STORAGE_DRIVER,
+          bucket: env.S3_BUCKET || null,
+        },
+      };
+    }
+
     if (env.STORAGE_DRIVER === "supabase") {
       const configured = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.SUPABASE_STORAGE_BUCKET);
       return {
