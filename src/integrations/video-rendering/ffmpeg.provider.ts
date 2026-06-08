@@ -137,6 +137,47 @@ async function materializeDataUrl(dataUrl: string, outputName: string) {
   return inputPath;
 }
 
+function extensionFromContentType(contentType: string, sourceUrl: string) {
+  if (contentType.includes("png")) return "png";
+  if (contentType.includes("webp")) return "webp";
+  if (contentType.includes("gif")) return "gif";
+  if (contentType.includes("jpeg") || contentType.includes("jpg")) return "jpg";
+
+  const cleanUrl = sourceUrl.split("?")[0] || "";
+  const extension = cleanUrl.match(/\.([a-z0-9]{2,5})$/i)?.[1];
+  return extension || "jpg";
+}
+
+async function materializeRemoteUrl(sourceUrl: string, outputName: string) {
+  const response = await fetch(sourceUrl, {
+    headers: {
+      "User-Agent": "AutoMedia/1.0 (+https://auto-media-sooty.vercel.app)",
+      Accept: "image/avif,image/webp,image/png,image/jpeg,image/*,*/*;q=0.8",
+    },
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    throw new AppError(`Nao foi possivel baixar a midia de origem (${response.status})`, 422, "VIDEO_SOURCE_DOWNLOAD_FAILED");
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.startsWith("image/")) {
+    throw new AppError(`A midia de origem nao parece ser uma imagem (${contentType || "sem content-type"})`, 422, "VIDEO_SOURCE_INVALID_TYPE");
+  }
+
+  const extension = extensionFromContentType(contentType, sourceUrl);
+  const inputPath = path.join(tmpdir(), `${outputName}-remote.${extension}`);
+  await writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
+  return inputPath;
+}
+
+async function materializeSource(source: string, outputName: string) {
+  if (source.startsWith("data:")) return materializeDataUrl(source, outputName);
+  if (/^https?:\/\//i.test(source)) return materializeRemoteUrl(source, outputName);
+  return source;
+}
+
 function runFfmpeg(args: string[]) {
   return new Promise<void>((resolve, reject) => {
     const child = spawn(env.FFMPEG_PATH, args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -201,9 +242,7 @@ async function renderScene(input: {
   width: number;
   height: number;
 }) {
-  const source = input.source.startsWith("data:")
-    ? await materializeDataUrl(input.source, `scene-${input.sceneIndex}-${path.basename(input.outputPath, ".mp4")}`)
-    : input.source;
+  const source = await materializeSource(input.source, `scene-${input.sceneIndex}-${path.basename(input.outputPath, ".mp4")}`);
 
   await runFfmpeg([
     "-y",
@@ -252,7 +291,7 @@ export const ffmpegProvider = {
     await mkdir(outputDir, { recursive: true });
 
     if (scenes.length <= 1) {
-      const source = fallbackSource.startsWith("data:") ? await materializeDataUrl(fallbackSource, safeName) : fallbackSource;
+      const source = await materializeSource(fallbackSource, safeName);
       await runFfmpeg([
         "-y",
         "-loop",
