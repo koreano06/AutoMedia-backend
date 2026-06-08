@@ -27,16 +27,19 @@ type OpenAITextResponse = {
 function buildLocalSuggestion(prompt: string) {
   const normalized = prompt.toLowerCase();
 
-  if (normalized.includes("coment")) {
-    return "Claro! Obrigado pelo interesse. Posso te enviar o link do produto agora para voce conferir os detalhes e aproveitar a oferta.";
-  }
-
   if (normalized.includes("roteiro") || normalized.includes("vídeo") || normalized.includes("video")) {
     return [
-      "Abertura: mostre o produto em uso e destaque o principal beneficio em 3 segundos.",
-      "Meio: apresente 2 diferenciais práticos, com cortes rápidos e legenda na tela.",
-      "Fechamento: inclua uma chamada para ação: comente 'eu quero' para receber o link.",
+      "Gancho inicial: mostre o produto em contexto real e destaque o principal beneficio em poucos segundos.",
+      "Cena 1: texto grande na tela com uma promessa clara e visual focado no produto.",
+      "Cena 2: apresente o benefício prático para a rotina do público-alvo.",
+      "Cena 3: reforce confiança com uso real, clareza visual e ritmo dinâmico.",
+      "Cena 4: finalize com CTA direto: comente 'eu quero' para receber o link.",
+      "Legenda: Produto em destaque para facilitar sua rotina. Comente 'eu quero' para receber o link e ver os detalhes.",
     ].join("\n");
+  }
+
+  if (normalized.includes("coment")) {
+    return "Claro! Obrigado pelo interesse. Posso te enviar o link do produto agora para voce conferir os detalhes e aproveitar a oferta.";
   }
 
   return "Destaque o benefício principal, mostre o produto em contexto real e finalize com uma chamada clara para o cliente pedir o link.";
