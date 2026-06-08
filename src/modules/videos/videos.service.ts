@@ -4,7 +4,7 @@ import { productsRepository } from "../products/products.repository.js";
 import { aiService } from "../ai/ai.service.js";
 import { AppError } from "../../shared/errors/AppError.js";
 import type { GenerateVideoInput } from "./videos.schemas.js";
-import { enqueueVideoGeneration } from "./video-generation.queue.js";
+import { enqueueVideoGeneration, type VideoRenderPlan, type VideoRenderScene } from "./video-generation.queue.js";
 
 function buildVideoPrompt(input: GenerateVideoInput, productName: string, productDescription?: string, mediaTitles: string[] = []) {
   const briefing = input.briefing_fields || {};
@@ -41,20 +41,88 @@ function buildVideoPrompt(input: GenerateVideoInput, productName: string, produc
   ].join("\n");
 }
 
-function buildRenderPlan(input: GenerateVideoInput, mediaUrls: string[], script: string) {
+function compactText(value?: string, fallback = "") {
+  return String(value || fallback)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function limitText(value: string, maxLength: number) {
+  const clean = compactText(value);
+  if (clean.length <= maxLength) return clean;
+  return `${clean.slice(0, maxLength - 1).trim()}…`;
+}
+
+function firstSentence(value?: string) {
+  return compactText(value).split(/[.!?]/)[0] || "";
+}
+
+function secondsFromDuration(duration?: string | number) {
+  if (typeof duration === "number") return Math.max(12, duration);
+  const match = String(duration || "30s").match(/\d+/);
+  return Math.max(12, Number(match?.[0] || 30));
+}
+
+function sceneDurations(totalSeconds: number) {
+  const base = Math.max(3, Math.floor(totalSeconds / 4));
+  const remainder = totalSeconds - base * 4;
+  return [base, base + Math.max(0, remainder), base, base];
+}
+
+function buildSceneTexts(input: GenerateVideoInput, productName: string, productDescription?: string) {
+  const briefing = input.briefing_fields || {};
+  const benefit = briefing.promise || firstSentence(productDescription) || "Mais praticidade no dia a dia";
+  const target = briefing.targetAudience || "sua rotina";
+  const cta = briefing.cta || "Comente EU QUERO";
+
+  return [
+    {
+      type: "hook",
+      headline: limitText(`Olha esse ${productName}`, 46),
+      subheadline: limitText(briefing.objective || "Criativo pronto para chamar atenção", 64),
+      instruction: "Abrir com movimento leve, texto grande e leitura rápida.",
+    },
+    {
+      type: "benefit",
+      headline: limitText(benefit, 48),
+      subheadline: limitText(`Ideal para ${target}`, 64),
+      instruction: "Destacar o principal benefício com zoom no produto.",
+    },
+    {
+      type: "proof",
+      headline: limitText("Visual de anúncio pronto", 42),
+      subheadline: limitText(briefing.tone || "Mensagem direta, natural e sem exagero", 64),
+      instruction: "Reforçar confiança e clareza antes do CTA.",
+    },
+    {
+      type: "cta",
+      headline: limitText(cta, 42),
+      subheadline: limitText("Receba o link e veja os detalhes", 64),
+      instruction: "Fechar com chamada forte e barra visual completa.",
+    },
+  ] as Array<Pick<VideoRenderScene, "type" | "headline" | "subheadline" | "instruction">>;
+}
+
+function buildRenderPlan(input: GenerateVideoInput, mediaUrls: string[], script: string, productName: string, productDescription?: string): VideoRenderPlan {
+  const totalSeconds = secondsFromDuration(input.duration);
+  const durations = sceneDurations(totalSeconds);
+  const sceneTexts = buildSceneTexts(input, productName, productDescription);
+  const fallbackSource = mediaUrls[0] || "product_image";
+
   return {
-    engine: "pending-renderer",
+    engine: "ffmpeg-scene-composer",
     format: input.format || "reels",
     ratio: input.ratio || "9:16",
     duration: input.duration,
     rhythm: input.rhythm || "Cortes dinâmicos",
     audio: input.audio || "Música tendência",
-    scenes: [
-      { order: 1, type: "hook", duration_seconds: 4, source: mediaUrls[0] || "product_image", instruction: "Abrir com benefício claro e texto grande." },
-      { order: 2, type: "benefits", duration_seconds: 12, source: mediaUrls[1] || mediaUrls[0] || "product_image", instruction: "Mostrar diferenciais com cortes curtos." },
-      { order: 3, type: "proof", duration_seconds: 8, source: mediaUrls[2] || mediaUrls[0] || "product_image", instruction: "Reforçar uso real e confiança." },
-      { order: 4, type: "cta", duration_seconds: 6, source: mediaUrls[0] || "product_image", instruction: "Finalizar com chamada para comentar eu quero." },
-    ],
+    brand: "AutoMedia",
+    scenes: sceneTexts.map((scene, index) => ({
+      ...scene,
+      order: index + 1,
+      duration_seconds: durations[index] || 4,
+      source: mediaUrls[index] || fallbackSource,
+    })),
     script,
   };
 }
@@ -69,11 +137,13 @@ export const videosService = {
     const mediaUrls = usableMedia.map((asset) => asset?.url || asset?.thumbnail_url).filter(Boolean) as string[];
     const mediaTitles = usableMedia.map((asset) => asset?.title || asset?.source || asset?.url).filter(Boolean) as string[];
     const prompt = buildVideoPrompt(payload, product.name, product.description, mediaTitles);
-    const aiResult = payload.script ? { text: payload.script, provider: "provided-script" } : aiService.generateText(prompt);
+    const aiResult = payload.script ? { text: payload.script, provider: "provided-script" } : await aiService.generateText(prompt);
     const script = aiResult.text || prompt;
-    const renderPlan = buildRenderPlan(payload, mediaUrls, script);
+    const productImageUrl = product.image_url || product.uploaded_image_url || "";
+    const renderMediaUrls = [...mediaUrls, productImageUrl].filter(Boolean);
+    const renderPlan = buildRenderPlan(payload, renderMediaUrls, script, product.name, product.description);
     const platforms = payload.platforms?.length ? payload.platforms : payload.platform ? [payload.platform] : [];
-    const previewUrl = mediaUrls[0] || product.image_url || product.uploaded_image_url || "";
+    const previewUrl = renderMediaUrls[0] || "";
 
     const job = await jobsRepository.create({
       type: "video_generation",
@@ -126,7 +196,11 @@ export const videosService = {
       await enqueueVideoGeneration({
         job_id: job.id,
         asset_id: asset.id,
+        product_name: product.name,
         source_url: previewUrl,
+        media_urls: renderMediaUrls,
+        render_plan: renderPlan,
+        script,
         duration: payload.duration,
         ratio: payload.ratio || "9:16",
       });

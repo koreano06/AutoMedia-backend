@@ -10,6 +10,20 @@ type OpenAIImageResponse = {
   }>;
 };
 
+type OpenAITextResponse = {
+  output_text?: string;
+  output?: Array<{
+    type?: string;
+    content?: Array<{
+      type?: string;
+      text?: string;
+    }>;
+  }>;
+  error?: {
+    message?: string;
+  };
+};
+
 function buildLocalSuggestion(prompt: string) {
   const normalized = prompt.toLowerCase();
 
@@ -101,12 +115,66 @@ async function generateWithOpenAI(input: GenerateImageInput) {
   return { image_url: imageUrl, provider: "openai" };
 }
 
-export const aiService = {
-  generateText(prompt: string) {
+function extractOpenAIText(payload: OpenAITextResponse) {
+  if (payload.output_text) return payload.output_text;
+
+  return (
+    payload.output
+      ?.flatMap((item) => item.content || [])
+      .map((content) => content.text)
+      .filter(Boolean)
+      .join("\n")
+      .trim() || ""
+  );
+}
+
+async function generateTextWithOpenAI(prompt: string) {
+  if (!env.OPENAI_API_KEY) {
     return {
       text: buildLocalSuggestion(prompt),
       provider: "local-template",
     };
+  }
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: env.OPENAI_TEXT_MODEL,
+      instructions: [
+        "Voce e um estrategista de criativos para social commerce.",
+        "Escreva roteiros curtos, claros e prontos para videos verticais.",
+        "Evite promessas exageradas, linguagem enganosa e tom de spam.",
+        "Retorne em portugues do Brasil.",
+      ].join(" "),
+      input: prompt,
+    }),
+  });
+
+  const payload = (await response.json()) as OpenAITextResponse;
+
+  if (!response.ok) {
+    return {
+      text: buildLocalSuggestion(prompt),
+      provider: `local-template-openai-error-${response.status}`,
+      error: payload.error?.message,
+    };
+  }
+
+  const text = extractOpenAIText(payload);
+
+  return {
+    text: text || buildLocalSuggestion(prompt),
+    provider: text ? "openai-responses" : "local-template-openai-empty",
+  };
+}
+
+export const aiService = {
+  async generateText(prompt: string) {
+    return generateTextWithOpenAI(prompt);
   },
 
   async generateImage(input: GenerateImageInput) {

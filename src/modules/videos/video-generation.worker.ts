@@ -26,7 +26,10 @@ export function startVideoGenerationWorker() {
       const rendered = await videoRendererService.render({
         jobId: payload.job_id,
         assetId: payload.asset_id,
+        productName: payload.product_name,
         sourceUrl: payload.source_url || asset?.thumbnail_url || asset?.url,
+        mediaUrls: payload.media_urls,
+        renderPlan: payload.render_plan,
         duration: payload.duration,
         ratio: payload.ratio,
       });
