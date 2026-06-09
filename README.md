@@ -10,7 +10,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - Banco PostgreSQL via Prisma.
 - Seeds e schema para produtos, mídias, jobs, posts, comentários, contas de plataforma, vendas e despesas.
 - Fila BullMQ com Redis.
-- Worker de geração de vídeo com FFmpeg.
+- Worker de geração/renderização de vídeo com plano criativo gerado por IA e montagem final via FFmpeg.
 - Storage local, S3/MinIO e suporte a Supabase Storage.
 - Integração OpenAI Images API para criativos visuais.
 - Integrações sociais com modo `mock` e preparação para modo `live`.
@@ -30,6 +30,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Seeds para teste da plataforma
 - ✅ Fila BullMQ com Redis
 - ✅ Worker FFmpeg para renderização de vídeos
+- ✅ Pipeline preparado para IA gerar roteiro, cenas, textos de tela e direção visual
 - ✅ Storage local, S3/MinIO e suporte a Supabase Storage
 - ✅ API de geração de imagens com OpenAI Images
 - ✅ Integrações sociais em modo `mock`
@@ -46,7 +47,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Testes de segurança para autenticação, permissão e assinatura de webhook
 - ✅ Testes de services para comments, jobs e posts
 - ✅ Smoke test CRUD para validar API real de ponta a ponta
-- 🟡 OpenAI em validação para fluxo profissional de criativos
+- 🟡 OpenAI em validação para fluxo profissional de roteiros, cenas e criativos
 - ✅ Storage persistente com MinIO/S3 na VM
 - ✅ Redis em container Docker na VM para BullMQ
 - ✅ Worker de vídeo rodando fora da Vercel em ambiente contínuo
@@ -105,7 +106,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ 11. Frontend preparado para apontar local, VM, tunnel ou API pública
 - 🟡 12. Domínio/tunnel HTTPS definitivo para `API_PUBLIC_URL`
 - 🟡 13. URL pública HTTPS para mídia/MinIO
-- 🟡 14. OpenAI real precisa estabilizar quota/billing/rate limit
+- 🟡 14. OpenAI real precisa estabilizar quota/billing/rate limit para gerar roteiros, cenas e criativos
 - 🔜 15. Publicação Instagram/Meta live
 - 🔜 16. Publicação TikTok live
 - 🔜 17. Webhooks/polling de comentários
@@ -424,22 +425,25 @@ Provedores preparados:
 Fluxo atual:
 
 1. Frontend envia produto, mídias, template, formato, duração, briefing e plataformas para `POST /api/videos/generate`.
-2. API cria um `Job` e um `MediaAsset`.
-3. Job entra na fila BullMQ `video_generation`.
-4. Worker pega o job, atualiza status para `rendering`.
-5. FFmpeg renderiza o MP4 usando a mídia base.
-6. Worker envia o arquivo para storage local, MinIO/S3 ou Supabase.
-7. Mídia final vira `pending_review`.
-8. Usuário aprova e agenda pelo frontend.
+2. IA gera roteiro, gancho, cenas, textos de tela, CTA, direção visual e plano de montagem.
+3. API cria um `Job` e um `MediaAsset`.
+4. Job entra na fila BullMQ `video_generation`.
+5. Worker pega o job, atualiza status para `rendering`.
+6. FFmpeg monta/renderiza o MP4 final usando o plano criativo gerado por IA e os assets disponíveis.
+7. Worker envia o arquivo para storage local, MinIO/S3 ou Supabase.
+8. Mídia final vira `pending_review`.
+9. Usuário aprova e agenda pelo frontend.
 
 Situação atual do fluxo:
 
 - ✅ Contrato frontend -> backend preparado
 - ✅ Criação de job e mídia inicial preparada
-- ✅ Worker FFmpeg implementado
+- ✅ Worker FFmpeg implementado para montagem/renderização
+- ✅ Plano criativo preparado para IA orientar cenas, textos e CTA
 - ✅ Execução contínua do worker na VM com systemd
 - ✅ Storage persistente com MinIO/S3 na VM
 - ✅ Feedback granular do job em evolução no frontend
+- 🟡 Geração de vídeo 100% por provedor de IA generativa ainda depende de API externa específica
 - 🔜 Publicação social real após aprovação
 
 Estados principais do job:
