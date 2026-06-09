@@ -1,6 +1,8 @@
 import { prisma } from "../../database/prisma.js";
 import { env } from "../../config/env.js";
 import { getQueueConnection } from "../../queue/queue.client.js";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 type DiagnosticUser = {
   id: string;
@@ -21,6 +23,13 @@ type CheckResult = {
   message: string;
   duration_ms: number;
   metadata?: Record<string, string | number | boolean | null>;
+};
+
+type ProductionChecklistItem = {
+  id: string;
+  title: string;
+  status: CheckStatus;
+  detail: string;
 };
 
 const availableChecks = ["auth", "database_write", "storage", "queue", "ai", "video_pipeline", "mock_publish", "latency", "contracts", "permissions"] as const;
@@ -81,6 +90,29 @@ function checkStorage() {
 
 function checkOpenAI() {
   return { status: env.OPENAI_API_KEY ? "ok" : "warning", image_model: env.OPENAI_IMAGE_MODEL };
+}
+
+function logsDir() {
+  return resolve(process.env.AUTOMEDIA_LOGS_DIR || join(process.cwd(), "..", "logs"));
+}
+
+function backupsDir() {
+  return resolve(process.env.BACKUPS_DIR || join(process.cwd(), "backups"));
+}
+
+function latestDirectoryAgeHours(directory: string) {
+  if (!existsSync(directory)) return null;
+  const entries = readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => statSync(join(directory, entry.name)).mtimeMs)
+    .sort((a, b) => b - a);
+
+  if (!entries.length) return null;
+  return (Date.now() - entries[0]) / 1000 / 60 / 60;
+}
+
+function item(id: string, title: string, status: CheckStatus, detail: string): ProductionChecklistItem {
+  return { id, title, status, detail };
 }
 
 async function checkVideoPipeline(user?: DiagnosticUser) {
@@ -404,6 +436,66 @@ export const diagnosticsService = {
       checked_at: new Date().toISOString(),
       results,
       available_checks: availableChecks,
+    };
+  },
+
+  async productionChecklist() {
+    const [database, redis, videoPipeline] = await Promise.all([checkDatabase(), checkRedis(), checkVideoPipeline()]);
+    const storage = checkStorage();
+    const backupAgeHours = latestDirectoryAgeHours(backupsDir());
+    const hasHttpsApi = env.API_PUBLIC_URL.startsWith("https://");
+    const hasHttpsFrontend = env.FRONTEND_URL.startsWith("https://");
+
+    const checks = [
+      item("api", "API saudável", database.status === "error" ? "error" : "ok", database.status === "error" ? database.message || "Banco indisponível." : "API com banco respondendo."),
+      item("redis", "Redis/BullMQ", redis.status === "error" ? "error" : "ok", redis.status === "error" ? redis.message || "Redis indisponível." : "Fila respondeu corretamente."),
+      item("storage", "Storage persistente", storage.status as CheckStatus, storage.status === "ok" ? `Driver ${storage.driver} configurado.` : "Storage precisa de revisão antes de produção forte."),
+      item("worker", "Worker de vídeo", videoPipeline.status, videoPipeline.message),
+      item("backup", "Backup recente", backupAgeHours === null ? "warning" : backupAgeHours > 30 ? "warning" : "ok", backupAgeHours === null ? "Nenhum backup completo encontrado." : `Backup mais recente há ${backupAgeHours.toFixed(1)}h.`),
+      item("openai", "OpenAI", env.OPENAI_API_KEY ? "ok" : "warning", env.OPENAI_API_KEY ? `Modelo de imagem: ${env.OPENAI_IMAGE_MODEL}.` : "OPENAI_API_KEY ausente."),
+      item("https_api", "API pública HTTPS", hasHttpsApi ? "ok" : "warning", hasHttpsApi ? env.API_PUBLIC_URL : "Configure domínio/tunnel HTTPS antes de uso externo real."),
+      item("https_frontend", "Frontend HTTPS", hasHttpsFrontend ? "ok" : "warning", hasHttpsFrontend ? env.FRONTEND_URL : "FRONTEND_URL deve ser HTTPS em produção."),
+      item("social", "Integrações sociais", env.SOCIAL_INTEGRATIONS_MODE === "live" ? "warning" : "ok", env.SOCIAL_INTEGRATIONS_MODE === "live" ? "Modo live ativo; confirme credenciais e permissões." : "Modo mock seguro para testes."),
+      item("secrets", "Secrets operacionais", env.JWT_SECRET === "change-me-in-production" ? "error" : "ok", env.JWT_SECRET === "change-me-in-production" ? "JWT_SECRET precisa ser trocado." : "JWT_SECRET não usa o padrão inseguro."),
+    ];
+
+    return {
+      status: checks.some((check) => check.status === "error") ? "error" : checks.some((check) => check.status === "warning") ? "warning" : "ok",
+      checked_at: new Date().toISOString(),
+      checks,
+    };
+  },
+
+  operationalLogs() {
+    const directory = logsDir();
+    if (!existsSync(directory)) {
+      return {
+        status: "warning",
+        directory,
+        logs: [],
+        message: "Diretório de logs ainda não existe.",
+      };
+    }
+
+    const allowedFiles = ["deploy-last.log", "health-monitor.log", "backup.log"];
+    const logs = allowedFiles
+      .map((file) => {
+        const filePath = join(directory, file);
+        if (!existsSync(filePath)) return null;
+        const content = readFileSync(filePath, "utf8").split(/\r?\n/).filter(Boolean).slice(-60);
+        return {
+          file,
+          updated_at: statSync(filePath).mtime.toISOString(),
+          lines: content,
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      status: logs.length ? "ok" : "warning",
+      directory,
+      logs,
+      message: logs.length ? "Logs operacionais carregados." : "Nenhum log operacional encontrado.",
     };
   },
 };

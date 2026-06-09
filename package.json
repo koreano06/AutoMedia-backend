@@ -25,6 +25,7 @@
     "infra:check": "node scripts/check-infrastructure.mjs",
     "monitor:health": "node scripts/health-monitor.mjs",
     "vm:deploy": "node scripts/vm-deploy.mjs",
+    "vm:install-timers": "node scripts/install-vm-timers.mjs",
     "secrets:rotate:checklist": "node scripts/rotate-secrets-checklist.mjs",
     "check:errors": "node scripts/report-errors-only.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",

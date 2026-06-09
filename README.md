@@ -57,6 +57,10 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Backup completo de PostgreSQL + MinIO com retenção
 - ✅ Script de deploy da VM com validações, restart e rollback simples
 - ✅ Monitoramento simples de API, Redis, storage e backup recente
+- ✅ Cache de mídia externa para storage próprio antes do render
+- ✅ Retry manual de jobs de vídeo falhos via API e frontend
+- ✅ Checklist de produção e logs operacionais expostos na aba Qualidade
+- ✅ Timers systemd instaláveis para backup e monitoramento automático
 - 🟡 URL pública HTTPS definitiva do backend ainda pendente
 - 🟡 MinIO público por HTTPS/domínio ainda pendente
 - 🟡 OpenAI configurada, mas dependente de quota/billing/rate limit
@@ -78,9 +82,13 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ 10. Evitar quebra de render quando imagem externa retorna 429 ou bloqueio
 - ✅ 11. Criar deploy automático com rollback simples para VM
 - ✅ 12. Criar monitoramento simples e documentação de backup agendado
-- 🟡 13. Publicar backend e mídia por HTTPS estável
-- 🟡 14. Estabilizar OpenAI real para criativos
-- 🔜 15. Implementar integrações sociais live
+- ✅ 13. Cachear mídia externa em MinIO/S3 antes de renderizar
+- ✅ 14. Reprocessar jobs de vídeo falhos pela interface
+- ✅ 15. Exibir checklist de produção e logs operacionais no frontend
+- ✅ 16. Instalar timers systemd para backup e monitoramento
+- 🟡 17. Publicar backend e mídia por HTTPS estável
+- 🟡 18. Estabilizar OpenAI real para criativos
+- 🔜 19. Implementar integrações sociais live
 
 ## Plano de Segurança
 
@@ -138,7 +146,11 @@ Camada atual:
 - Auditoria mascara tokens, segredos, senhas e emails.
 - `GET /api/diagnostics` exige autenticação e mostra saúde de banco, Redis, storage, OpenAI e worker.
 - `POST /api/diagnostics/run-checks` inclui `video_pipeline` para detectar jobs de vídeo parados, falhas recentes e fila ativa.
+- `GET /api/diagnostics/production-checklist` retorna um checklist seguro de prontidão operacional.
+- `GET /api/diagnostics/logs` retorna últimas linhas de logs de deploy, monitoramento e backup sem expor secrets.
 - O renderizador FFmpeg tenta baixar a mídia externa, mas se a fonte responder `429`, bloquear hotlink ou falhar, o job continua com uma imagem fallback local para revisão.
+- A geração de vídeo tenta cachear imagens/vídeos externos no storage próprio antes de enviar para render, reduzindo dependência de hotlinks.
+- Jobs de vídeo `failed` ou `cancelled` podem ser reenfileirados em `POST /api/jobs/:id/retry`.
 - Upload de imagem aceita apenas `image/jpeg`, `image/png`, `image/webp` e `image/gif`, com limite de 8 MB.
 - Rotas financeiras e exclusão de anúncio exigem papel `admin`.
 
@@ -162,6 +174,7 @@ Operação da VM:
 ```bash
 npm run vm:deploy
 npm run monitor:health
+npm run vm:install-timers
 ```
 
 Guia completo:
@@ -313,6 +326,7 @@ npm run prod:check   # valida variáveis essenciais de produção
 npm run infra:check  # valida Redis e storage persistente
 npm run monitor:health # verifica API, Redis, storage e backup recente
 npm run vm:deploy    # deploy na VM com rollback simples
+npm run vm:install-timers # instala timers systemd de backup e monitoramento
 npm run backup:full  # backup PostgreSQL + MinIO com retenção
 ```
 
@@ -550,6 +564,19 @@ Adicione:
 ```
 
 Os arquivos são salvos em `BACKUPS_DIR` e backups antigos são removidos conforme `BACKUP_RETENTION_DAYS`.
+
+Alternativa recomendada ao cron: timers systemd instaláveis pelo projeto.
+
+```bash
+cd ~/automedia/backend
+npm run vm:install-timers
+systemctl list-timers 'automedia-*'
+```
+
+Timers criados:
+
+- `automedia-backup.timer`: roda `npm run backup:full` todos os dias às 03:15.
+- `automedia-monitor.timer`: roda `npm run monitor:health` a cada 10 minutos.
 
 ## Deploy na Vercel
 

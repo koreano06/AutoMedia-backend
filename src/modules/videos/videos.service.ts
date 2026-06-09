@@ -2,6 +2,8 @@ import { jobsRepository } from "../jobs/jobs.repository.js";
 import { mediaRepository } from "../media/media.repository.js";
 import { productsRepository } from "../products/products.repository.js";
 import { aiService } from "../ai/ai.service.js";
+import { env } from "../../config/env.js";
+import { storageService } from "../../integrations/storage/storage.service.js";
 import { AppError } from "../../shared/errors/AppError.js";
 import type { GenerateVideoInput } from "./videos.schemas.js";
 import { enqueueVideoGeneration, type VideoRenderPlan, type VideoRenderScene } from "./video-generation.queue.js";
@@ -127,6 +129,54 @@ function buildRenderPlan(input: GenerateVideoInput, mediaUrls: string[], script:
   };
 }
 
+function isHttpUrl(value?: string) {
+  return /^https?:\/\//i.test(String(value || ""));
+}
+
+function isInternalStorageUrl(value: string) {
+  const candidates = [
+    env.API_PUBLIC_URL,
+    env.S3_PUBLIC_URL,
+    env.S3_ENDPOINT,
+    env.SUPABASE_URL,
+  ].filter(Boolean) as string[];
+
+  return candidates.some((candidate) => value.startsWith(candidate.replace(/\/$/, "")));
+}
+
+async function cacheRenderMediaUrls(urls: string[], workspaceId: string | undefined, productId: string) {
+  const cachedUrls: string[] = [];
+  const cacheMetadata = [];
+
+  for (const [index, url] of urls.entries()) {
+    if (!isHttpUrl(url) || isInternalStorageUrl(url)) {
+      cachedUrls.push(url);
+      continue;
+    }
+
+    try {
+      const cached = await storageService.cacheRemoteMedia({
+        url,
+        keyPrefix: `source-media/${workspaceId || "global"}/${productId}`,
+        fallbackName: `media-${index}`,
+      });
+
+      cachedUrls.push(cached.url);
+      cacheMetadata.push({
+        original_url: url,
+        cached_url: cached.url,
+        storage_key: cached.storage_key,
+        content_type: cached.content_type,
+        size: cached.size,
+      });
+    } catch {
+      cachedUrls.push(url);
+    }
+  }
+
+  return { urls: cachedUrls, cacheMetadata };
+}
+
 export const videosService = {
   async generate(payload: GenerateVideoInput, workspaceId?: string) {
     const product = await productsRepository.findById(payload.product_id);
@@ -140,7 +190,9 @@ export const videosService = {
     const aiResult = payload.script ? { text: payload.script, provider: "provided-script" } : await aiService.generateText(prompt);
     const script = aiResult.text || prompt;
     const productImageUrl = product.image_url || product.uploaded_image_url || "";
-    const renderMediaUrls = [...mediaUrls, productImageUrl].filter(Boolean);
+    const rawRenderMediaUrls = [...mediaUrls, productImageUrl].filter(Boolean);
+    const mediaCache = await cacheRenderMediaUrls(rawRenderMediaUrls, workspaceId || product.workspace_id, product.id);
+    const renderMediaUrls = mediaCache.urls;
     const renderPlan = buildRenderPlan(payload, renderMediaUrls, script, product.name, product.description);
     const platforms = payload.platforms?.length ? payload.platforms : payload.platform ? [payload.platform] : [];
     const previewUrl = renderMediaUrls[0] || "";
@@ -183,6 +235,7 @@ export const videosService = {
         render_plan: renderPlan,
         prompt,
         media_asset_ids: payload.media_asset_ids || [],
+        cached_media: mediaCache.cacheMetadata,
         visual_prompt: payload.visual_prompt,
       },
     });
@@ -235,6 +288,7 @@ export const videosService = {
         ai_provider: aiResult.provider,
         prompt,
         render_plan: renderPlan,
+        cached_media: mediaCache.cacheMetadata,
         media_asset_ids: payload.media_asset_ids || [],
       },
       result: {

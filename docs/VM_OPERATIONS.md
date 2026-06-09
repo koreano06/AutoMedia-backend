@@ -44,6 +44,27 @@ AUTOMEDIA_HEALTH_URL=http://localhost:3333/api/health
 
 ## Backup automático com systemd timer
 
+Instalação recomendada pelo próprio projeto:
+
+```bash
+cd /home/gustavo/automedia/backend
+npm run vm:install-timers
+systemctl list-timers 'automedia-*'
+```
+
+Esse comando cria e ativa:
+
+- `automedia-backup.timer`: backup completo diário às 03:15.
+- `automedia-monitor.timer`: monitoramento a cada 10 minutos.
+
+Backup manual:
+
+```bash
+npm run backup:full
+```
+
+Se quiser instalar manualmente, use a referência abaixo.
+
 Crie `/etc/systemd/system/automedia-backup.service`:
 
 ```ini
@@ -80,12 +101,6 @@ sudo systemctl enable --now automedia-backup.timer
 systemctl list-timers automedia-backup.timer
 ```
 
-Backup manual:
-
-```bash
-npm run backup:full
-```
-
 ## Monitoramento simples
 
 Script:
@@ -107,7 +122,7 @@ Logs:
 /home/gustavo/automedia/logs/health-monitor.log
 ```
 
-Exemplo de timer a cada 5 minutos:
+Exemplo manual de timer:
 
 ```ini
 [Unit]
@@ -122,11 +137,11 @@ ExecStart=/usr/bin/npm run monitor:health
 
 ```ini
 [Unit]
-Description=Run AutoMedia health monitor every 5 minutes
+Description=Run AutoMedia health monitor every 10 minutes
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=5min
+OnUnitActiveSec=10min
 Persistent=true
 Unit=automedia-monitor.service
 
@@ -147,3 +162,8 @@ journalctl -u automedia-backend -n 100 --no-pager
 journalctl -u automedia-video-worker -n 100 --no-pager
 journalctl -u automedia-backup -n 100 --no-pager
 ```
+
+Também é possível consultar resumo pelo frontend na aba **Qualidade**, que consome:
+
+- `GET /api/diagnostics/production-checklist`
+- `GET /api/diagnostics/logs`
