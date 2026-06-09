@@ -20,6 +20,15 @@ function run(command, args, errorMessage) {
   }
 }
 
+function parseDatabaseUrl() {
+  const url = new URL(databaseUrl);
+  return {
+    database: url.pathname.replace(/^\//, "") || "automedia",
+    username: decodeURIComponent(url.username || "automedia"),
+    password: decodeURIComponent(url.password || ""),
+  };
+}
+
 function createBackupDir() {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const backupDir = join(backupsDir, stamp);
@@ -34,7 +43,44 @@ function backupDatabase(backupDir) {
 
   const output = join(backupDir, "postgres.dump");
   console.log(`Criando backup PostgreSQL em ${output}`);
-  run("pg_dump", [databaseUrl, "--format=custom", "--no-owner", "--no-acl", "--file", output], "Falha ao executar pg_dump. Instale o pacote postgresql-client na VM.");
+
+  const localPgDump = spawnSync("pg_dump", [databaseUrl, "--format=custom", "--no-owner", "--no-acl", "--file", output], {
+    stdio: "inherit",
+  });
+
+  if (!localPgDump.error && localPgDump.status === 0) {
+    return output;
+  }
+
+  const postgresContainer = process.env.POSTGRES_CONTAINER || "automedia-postgres";
+  const { database, username, password } = parseDatabaseUrl();
+  console.warn(`pg_dump local indisponível. Tentando backup pelo container ${postgresContainer}.`);
+
+  const dockerPgDump = spawnSync(
+    "docker",
+    [
+      "exec",
+      "-e",
+      `PGPASSWORD=${password}`,
+      postgresContainer,
+      "pg_dump",
+      "-U",
+      username,
+      "-d",
+      database,
+      "--format=custom",
+      "--no-owner",
+      "--no-acl",
+    ],
+    { encoding: "buffer", maxBuffer: 1024 * 1024 * 1024 },
+  );
+
+  if (dockerPgDump.error || dockerPgDump.status !== 0) {
+    const stderr = dockerPgDump.stderr?.toString("utf8") || "";
+    throw new Error(`Falha ao executar pg_dump local e via Docker. ${stderr}`.trim());
+  }
+
+  writeFileSync(output, dockerPgDump.stdout);
   return output;
 }
 
