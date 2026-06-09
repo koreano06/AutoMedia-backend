@@ -52,8 +52,12 @@ if (process.env.STORAGE_DRIVER === "supabase") {
   ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_STORAGE_BUCKET"].forEach((key) => {
     if (!process.env[key]) missing.push(key);
   });
+} else if (process.env.STORAGE_DRIVER === "s3") {
+  ["S3_ENDPOINT", "S3_PUBLIC_URL", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"].forEach((key) => {
+    if (!process.env[key]) missing.push(key);
+  });
 } else {
-  warnings.push("STORAGE_DRIVER nao esta como supabase. Em producao, arquivos locais podem ser perdidos.");
+  warnings.push("STORAGE_DRIVER esta local. Em producao, use s3/MinIO ou supabase para persistir arquivos.");
 }
 
 if (process.env.VIDEO_RENDER_DRIVER === "ffmpeg" && !process.env.FFMPEG_PATH) {

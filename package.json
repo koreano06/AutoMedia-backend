@@ -11,6 +11,7 @@
     "db:verify:security": "node scripts/verify-database-security.mjs",
     "db:backfill:security": "node scripts/backfill-security-workspace.mjs",
     "db:backup": "node scripts/backup-database.mjs",
+    "backup:full": "node scripts/backup-system.mjs",
     "crud:check": "node scripts/verify-crud-contract.mjs",
     "db:migrate": "prisma migrate dev --schema prisma/schema.prisma",
     "db:deploy": "prisma migrate deploy --schema prisma/schema.prisma",

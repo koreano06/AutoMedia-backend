@@ -182,6 +182,7 @@ async function runAICheck() {
     status: env.OPENAI_API_KEY ? "ok" : "warning",
     message: env.OPENAI_API_KEY ? "Chave OpenAI configurada. Chamada paga não foi executada neste teste rápido." : "OPENAI_API_KEY ausente.",
     metadata: {
+      text_model: env.OPENAI_TEXT_MODEL,
       image_model: env.OPENAI_IMAGE_MODEL,
       fallback_enabled: String(env.OPENAI_IMAGE_FALLBACK_ENABLED),
     },

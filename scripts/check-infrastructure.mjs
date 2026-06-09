@@ -56,10 +56,17 @@ async function checkRedis() {
   }
 }
 
-async function checkSupabaseStorage() {
+async function checkStorage() {
   const storageDriver = process.env.STORAGE_DRIVER || "local";
+  if (storageDriver === "s3") {
+    ["S3_ENDPOINT", "S3_PUBLIC_URL", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"].forEach((key) => {
+      if (!process.env[key]) errors.push(`${key} nao configurada para storage S3/MinIO.`);
+    });
+    return;
+  }
+
   if (storageDriver !== "supabase") {
-    warnings.push("STORAGE_DRIVER nao esta como supabase. Videos gerados nao terao storage persistente em producao.");
+    warnings.push("STORAGE_DRIVER esta local. Videos gerados nao terao storage persistente em producao.");
     return;
   }
 
@@ -92,7 +99,7 @@ async function checkSupabaseStorage() {
 }
 
 await checkRedis();
-await checkSupabaseStorage();
+await checkStorage();
 
 if (errors.length > 0) {
   console.error("Falha na checagem de infraestrutura:");

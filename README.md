@@ -11,10 +11,10 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - Seeds e schema para produtos, mídias, jobs, posts, comentários, contas de plataforma, vendas e despesas.
 - Fila BullMQ com Redis.
 - Worker de geração de vídeo com FFmpeg.
-- Storage local e suporte a Supabase Storage.
+- Storage local, S3/MinIO e suporte a Supabase Storage.
 - Integração OpenAI Images API para criativos visuais.
 - Integrações sociais com modo `mock` e preparação para modo `live`.
-- Deploy da API preparado para Vercel.
+- Deploy atual preparado para VM/home lab com systemd, worker contínuo, Redis, PostgreSQL e MinIO.
 - Login em produção validado em `POST /api/auth/login`.
 - Usuário de teste garantido pelo seed: `admin / admin123`.
 
@@ -28,7 +28,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Seeds para teste da plataforma
 - ✅ Fila BullMQ com Redis
 - ✅ Worker FFmpeg para renderização de vídeos
-- ✅ Storage local e suporte a Supabase Storage
+- ✅ Storage local, S3/MinIO e suporte a Supabase Storage
 - ✅ API de geração de imagens com OpenAI Images
 - ✅ Integrações sociais em modo `mock`
 - ✅ Rotas privadas protegidas por JWT
@@ -45,9 +45,11 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Testes de services para comments, jobs e posts
 - ✅ Smoke test CRUD para validar API real de ponta a ponta
 - 🟡 OpenAI em validação para fluxo profissional de criativos
-- 🟡 Supabase Storage em configuração para produção
-- 🟡 Redis gerenciado em produção ainda pendente de definição final
-- 🟡 Worker de vídeo precisa rodar fora da Vercel em ambiente contínuo
+- ✅ Storage persistente com MinIO/S3 na VM
+- ✅ Redis em container Docker na VM para BullMQ
+- ✅ Worker de vídeo rodando fora da Vercel em ambiente contínuo
+- ✅ Backup completo de PostgreSQL + MinIO com retenção
+- 🟡 URL pública HTTPS definitiva do backend ainda pendente
 - 🔜 Publicação real em redes sociais
 - 🔜 Integração live com Shopee, Mercado Livre, TikTok e Meta
 - 🔜 Webhooks/polling para comentários e respostas automáticas
@@ -55,7 +57,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 ## Plano de Estabilização
 
 - ✅ 1. Consolidar ambiente de produção
-- 🟡 2. Fechar Redis + Supabase Storage
+- ✅ 2. Fechar Redis + storage persistente na VM
 - 🔜 3. Melhorar acompanhamento em tempo real dos jobs
 - ✅ 4. Fortalecer autenticação e sessão
 - ✅ 5. Revisar CRUDs ponta a ponta
@@ -107,9 +109,24 @@ Backup:
 
 ```bash
 npm run db:backup
+npm run backup:full
 ```
 
-O backup usa `pg_dump`; se ele não estiver instalado localmente, use o backup nativo do provedor PostgreSQL/Neon.
+`db:backup` salva apenas o PostgreSQL usando `pg_dump`.
+
+`backup:full` é o backup recomendado para a VM: ele cria um dump do PostgreSQL, compacta os dados do MinIO quando `MINIO_DATA_DIR` existir e remove backups antigos conforme `BACKUP_RETENTION_DAYS`.
+
+Na VM, instale o cliente PostgreSQL caso ainda não exista:
+
+```bash
+sudo apt install -y postgresql-client
+```
+
+Exemplo de cron diário às 03:15:
+
+```bash
+15 3 * * * cd /home/gustavo/automedia/backend && /usr/bin/npm run backup:full >> /home/gustavo/automedia/logs/backup.log 2>&1
+```
 
 Para validar as variáveis essenciais do backend antes de publicar:
 
@@ -117,7 +134,7 @@ Para validar as variáveis essenciais do backend antes de publicar:
 npm run prod:check
 ```
 
-Para validar Redis e Supabase Storage em ambiente real:
+Para validar Redis e storage persistente em ambiente real:
 
 ```bash
 npm run infra:check
@@ -151,7 +168,8 @@ Se o CLI pedir aceite de termos, abra o link mostrado, aceite no navegador e rod
 - BullMQ
 - Redis/ioredis
 - FFmpeg
-- Supabase Storage
+- MinIO/S3
+- Supabase Storage opcional
 - OpenAI Images API
 - Zod
 - Vitest
@@ -226,7 +244,8 @@ npm run crud:check   # smoke test CRUD contra API real
 npm run check:errors # roda validações e mostra apenas erros
 npm run worker:video # worker BullMQ de renderização de vídeo
 npm run prod:check   # valida variáveis essenciais de produção
-npm run infra:check  # valida Redis e Supabase Storage
+npm run infra:check  # valida Redis e storage persistente
+npm run backup:full  # backup PostgreSQL + MinIO com retenção
 ```
 
 ## Testes e Qualidade
@@ -302,11 +321,33 @@ OPENAI_IMAGE_FALLBACK_ENABLED="false"
 ```env
 STORAGE_DRIVER="local"
 UPLOADS_DIR="uploads"
+BACKUPS_DIR="backups"
+BACKUP_RETENTION_DAYS="14"
+MINIO_DATA_DIR="../data/minio"
+S3_ENDPOINT="http://localhost:9000"
+S3_PUBLIC_URL="http://192.168.1.6:9000"
+S3_REGION="us-east-1"
+S3_BUCKET="automedia-media"
+S3_ACCESS_KEY_ID=""
+S3_SECRET_ACCESS_KEY=""
+S3_FORCE_PATH_STYLE="true"
 SUPABASE_URL=""
 SUPABASE_SERVICE_ROLE_KEY=""
 SUPABASE_STORAGE_BUCKET="videos"
 VIDEO_RENDER_DRIVER="ffmpeg"
 FFMPEG_PATH="ffmpeg"
+```
+
+Para produção atual na VM com MinIO:
+
+```env
+STORAGE_DRIVER="s3"
+S3_ENDPOINT="http://localhost:9000"
+S3_PUBLIC_URL="https://media.seudominio.com"
+S3_BUCKET="automedia-media"
+S3_ACCESS_KEY_ID="automedia"
+S3_SECRET_ACCESS_KEY="troque-essa-senha"
+S3_FORCE_PATH_STYLE="true"
 ```
 
 Para produção com Supabase:
@@ -323,10 +364,11 @@ Checklist de infraestrutura recomendado para produção:
 - `REDIS_URL` ou `UPSTASH_REDIS_URL` deve apontar para Redis gerenciado em formato `redis://` ou `rediss://`.
 - Para Upstash/Vercel Marketplace, use o produto `upstash/upstash-kv` e configure uma URL Redis TCP/TLS, não apenas a URL REST.
 - Variáveis `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` são úteis para cache simples, mas BullMQ precisa de `rediss://...`.
-- `STORAGE_DRIVER` deve ser `supabase`.
-- `SUPABASE_STORAGE_BUCKET` deve existir antes do primeiro render.
+- `STORAGE_DRIVER` deve ser `s3` com MinIO/S3 ou `supabase`.
+- Com MinIO, `S3_PUBLIC_URL` precisa ser acessível pelo navegador para preview dos vídeos.
+- Com Supabase, `SUPABASE_STORAGE_BUCKET` deve existir antes do primeiro render.
 - O bucket precisa ser público ou o backend deve evoluir para gerar URLs assinadas.
-- O worker de vídeo precisa usar as mesmas variáveis `DATABASE_URL`, `REDIS_URL` e `SUPABASE_*` da API.
+- O worker de vídeo precisa usar as mesmas variáveis `DATABASE_URL`, `REDIS_URL` e storage da API.
 - Rode `npm run infra:check` no ambiente onde a API/worker estiver configurado.
 
 ### Integrações Sociais
@@ -354,7 +396,7 @@ Fluxo atual:
 3. Job entra na fila BullMQ `video_generation`.
 4. Worker pega o job, atualiza status para `rendering`.
 5. FFmpeg renderiza o MP4 usando a mídia base.
-6. Worker envia o arquivo para storage local ou Supabase.
+6. Worker envia o arquivo para storage local, MinIO/S3 ou Supabase.
 7. Mídia final vira `pending_review`.
 8. Usuário aprova e agenda pelo frontend.
 
@@ -363,9 +405,9 @@ Situação atual do fluxo:
 - ✅ Contrato frontend -> backend preparado
 - ✅ Criação de job e mídia inicial preparada
 - ✅ Worker FFmpeg implementado
-- 🟡 Execução contínua do worker ainda precisa de hospedagem própria fora da Vercel
-- 🟡 Storage persistente com Supabase ainda precisa ser ativado em produção
-- 🟡 Feedback granular do job no frontend ainda está em evolução
+- ✅ Execução contínua do worker na VM com systemd
+- ✅ Storage persistente com MinIO/S3 na VM
+- ✅ Feedback granular do job em evolução no frontend
 - 🔜 Publicação social real após aprovação
 
 Estados principais do job:
@@ -382,17 +424,65 @@ failed
 
 ## Produção
 
-Recomendação prática:
+Produção atual escolhida para economizar e manter controle:
 
-- API: Vercel.
-- Banco: Supabase Postgres, Neon, Railway Postgres ou outro PostgreSQL gerenciado.
-- Redis: Upstash Redis, Railway Redis ou Redis gerenciado.
-- Worker de vídeo: Railway, Render, Fly.io, VPS ou container com FFmpeg.
-- Storage: Supabase Storage ou S3 compatível.
+- API: VM/home lab com systemd.
+- Banco: PostgreSQL em Docker na VM.
+- Redis: Redis em Docker na VM.
+- Worker de vídeo: systemd na VM com FFmpeg.
+- Storage: MinIO/S3 em Docker na VM.
+- Frontend: Vercel apontando para uma URL pública HTTPS do backend.
 
-A Vercel é adequada para a API, mas o worker `npm run worker:video` deve rodar em um serviço com processo contínuo e FFmpeg disponível.
+Próximo ajuste obrigatório para uso fora da rede local: publicar a API e o MinIO por domínio/tunnel HTTPS. O frontend da Vercel não deve apontar para `192.168.1.6`.
+
+Quando a demanda aumentar, a migração mais simples é manter a mesma arquitetura e trocar cada peça por serviço gerenciado: PostgreSQL gerenciado, Redis gerenciado e S3/Supabase Storage.
+
+### VM/Home Lab
+
+Serviços esperados na VM:
+
+```bash
+sudo systemctl status automedia-backend
+sudo systemctl status automedia-video-worker
+cd ~/automedia && docker compose ps
+```
+
+Deploy operacional:
+
+```bash
+~/automedia/deploy-backend.sh
+```
+
+Healthcheck:
+
+```bash
+curl http://localhost:3333/api/health
+```
+
+Backup completo manual:
+
+```bash
+cd ~/automedia/backend
+npm run backup:full
+```
+
+Backup automático diário com cron:
+
+```bash
+crontab -e
+```
+
+Adicione:
+
+```cron
+15 3 * * * cd /home/gustavo/automedia/backend && /usr/bin/npm run backup:full >> /home/gustavo/automedia/logs/backup.log 2>&1
+```
+
+Os arquivos são salvos em `BACKUPS_DIR` e backups antigos são removidos conforme `BACKUP_RETENTION_DAYS`.
 
 ## Deploy na Vercel
+
+O backend pode rodar na Vercel, mas o modo recomendado atual é VM por causa do worker contínuo, FFmpeg e MinIO. Se voltar para Vercel, use:
 
 Configuração recomendada:
 
