@@ -55,6 +55,8 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Worker valida mídia ausente, registra falhas/stalls e limpa temporários após upload
 - ✅ Renderização protegida contra falha de URL externa, incluindo HTTP 429, com fallback visual local
 - ✅ Backup completo de PostgreSQL + MinIO com retenção
+- ✅ Script de deploy da VM com validações, restart e rollback simples
+- ✅ Monitoramento simples de API, Redis, storage e backup recente
 - 🟡 URL pública HTTPS definitiva do backend ainda pendente
 - 🟡 MinIO público por HTTPS/domínio ainda pendente
 - 🟡 OpenAI configurada, mas dependente de quota/billing/rate limit
@@ -74,9 +76,11 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ 8. Adicionar diagnóstico real do pipeline de vídeo
 - ✅ 9. Fortalecer resiliência do worker de vídeo
 - ✅ 10. Evitar quebra de render quando imagem externa retorna 429 ou bloqueio
-- 🟡 11. Publicar backend e mídia por HTTPS estável
-- 🟡 12. Estabilizar OpenAI real para criativos
-- 🔜 13. Implementar integrações sociais live
+- ✅ 11. Criar deploy automático com rollback simples para VM
+- ✅ 12. Criar monitoramento simples e documentação de backup agendado
+- 🟡 13. Publicar backend e mídia por HTTPS estável
+- 🟡 14. Estabilizar OpenAI real para criativos
+- 🔜 15. Implementar integrações sociais live
 
 ## Plano de Segurança
 
@@ -151,6 +155,19 @@ Backup:
 ```bash
 npm run db:backup
 npm run backup:full
+```
+
+Operação da VM:
+
+```bash
+npm run vm:deploy
+npm run monitor:health
+```
+
+Guia completo:
+
+```text
+docs/VM_OPERATIONS.md
 ```
 
 `db:backup` salva apenas o PostgreSQL usando `pg_dump`.
@@ -294,6 +311,8 @@ npm run check:errors # roda validações e mostra apenas erros
 npm run worker:video # worker BullMQ de renderização de vídeo
 npm run prod:check   # valida variáveis essenciais de produção
 npm run infra:check  # valida Redis e storage persistente
+npm run monitor:health # verifica API, Redis, storage e backup recente
+npm run vm:deploy    # deploy na VM com rollback simples
 npm run backup:full  # backup PostgreSQL + MinIO com retenção
 ```
 

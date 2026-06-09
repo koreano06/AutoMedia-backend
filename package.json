@@ -23,6 +23,8 @@
     "worker:video": "tsx src/modules/videos/video-generation.worker.cli.ts",
     "prod:check": "node scripts/check-production-env.mjs",
     "infra:check": "node scripts/check-infrastructure.mjs",
+    "monitor:health": "node scripts/health-monitor.mjs",
+    "vm:deploy": "node scripts/vm-deploy.mjs",
     "secrets:rotate:checklist": "node scripts/rotate-secrets-checklist.mjs",
     "check:errors": "node scripts/report-errors-only.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
