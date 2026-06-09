@@ -178,6 +178,71 @@ async function materializeSource(source: string, outputName: string) {
   return source;
 }
 
+async function createFallbackImage(input: {
+  outputName: string;
+  productName?: string;
+  headline?: string;
+  subheadline?: string;
+  width: number;
+  height: number;
+  reason?: string;
+}) {
+  const outputPath = path.join(tmpdir(), `${input.outputName}-fallback.png`);
+  const title = escapeDrawText(wrapText(limitText(input.headline || input.productName || "Produto em destaque", 72), input.width >= 1600 ? 28 : 20, 3));
+  const subtitle = escapeDrawText(wrapText(limitText(input.subheadline || "Mídia externa indisponível. Criativo gerado com fallback seguro.", 96), input.width >= 1600 ? 42 : 28, 2));
+  const reason = escapeDrawText(wrapText(limitText(input.reason || "Fonte externa bloqueou o download", 90), input.width >= 1600 ? 46 : 30, 2));
+  const titleSize = clamp(Math.round(input.width / 18), 42, 74);
+  const subtitleSize = clamp(Math.round(input.width / 34), 26, 38);
+  const badgeSize = clamp(Math.round(input.width / 44), 20, 28);
+
+  await runFfmpeg([
+    "-y",
+    "-f",
+    "lavfi",
+    "-i",
+    `color=c=0x111827:s=${input.width}x${input.height}:d=1`,
+    "-frames:v",
+    "1",
+    "-vf",
+    [
+      `drawbox=x=0:y=0:w=iw:h=ih:color=0x0b1120@0.35:t=fill`,
+      `drawbox=x=70:y=80:w=310:h=58:color=0xff6a2a@0.95:t=fill`,
+      `drawtext=text='AutoMedia':fontcolor=white:fontsize=${badgeSize}:x=100:y=96`,
+      `drawtext=text='${title}':fontcolor=white:fontsize=${titleSize}:line_spacing=10:x=80:y=${Math.round(input.height * 0.46)}`,
+      `drawtext=text='${subtitle}':fontcolor=white@0.86:fontsize=${subtitleSize}:line_spacing=7:x=82:y=${Math.round(input.height * 0.46) + Math.round(titleSize * 2.4)}`,
+      `drawtext=text='${reason}':fontcolor=0xffa06a:fontsize=${Math.max(18, badgeSize - 3)}:line_spacing=5:x=82:y=h-190`,
+    ].join(","),
+    outputPath,
+  ]);
+
+  return outputPath;
+}
+
+async function materializeSceneSource(input: {
+  source: string;
+  outputName: string;
+  scene: VideoRenderScene;
+  productName?: string;
+  width: number;
+  height: number;
+}) {
+  try {
+    return await materializeSource(input.source, input.outputName);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Falha ao carregar mídia externa";
+    console.warn(`[video-render] Usando fallback visual para ${input.outputName}: ${message}`);
+    return createFallbackImage({
+      outputName: input.outputName,
+      productName: input.productName,
+      headline: input.scene.headline,
+      subheadline: input.scene.subheadline,
+      width: input.width,
+      height: input.height,
+      reason: message,
+    });
+  }
+}
+
 function runFfmpeg(args: string[]) {
   return new Promise<void>((resolve, reject) => {
     const child = spawn(env.FFMPEG_PATH, args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -241,8 +306,16 @@ async function renderScene(input: {
   outputPath: string;
   width: number;
   height: number;
+  productName?: string;
 }) {
-  const source = await materializeSource(input.source, `scene-${input.sceneIndex}-${path.basename(input.outputPath, ".mp4")}`);
+  const source = await materializeSceneSource({
+    source: input.source,
+    outputName: `scene-${input.sceneIndex}-${path.basename(input.outputPath, ".mp4")}`,
+    scene: input.scene,
+    productName: input.productName,
+    width: input.width,
+    height: input.height,
+  });
 
   await runFfmpeg([
     "-y",
@@ -291,7 +364,14 @@ export const ffmpegProvider = {
     await mkdir(outputDir, { recursive: true });
 
     if (scenes.length <= 1) {
-      const source = await materializeSource(fallbackSource, safeName);
+      const source = await materializeSceneSource({
+        source: fallbackSource,
+        outputName: safeName,
+        scene: scenes[0] || defaultScenes(input, fallbackSource)[0],
+        productName: input.productName,
+        width,
+        height,
+      });
       await runFfmpeg([
         "-y",
         "-loop",
@@ -334,6 +414,7 @@ export const ffmpegProvider = {
         outputPath: scenePath,
         width,
         height,
+        productName: input.productName,
       });
     }
 

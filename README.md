@@ -53,6 +53,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Redis em container Docker na VM para BullMQ
 - ✅ Worker de vídeo rodando fora da Vercel em ambiente contínuo
 - ✅ Worker valida mídia ausente, registra falhas/stalls e limpa temporários após upload
+- ✅ Renderização protegida contra falha de URL externa, incluindo HTTP 429, com fallback visual local
 - ✅ Backup completo de PostgreSQL + MinIO com retenção
 - 🟡 URL pública HTTPS definitiva do backend ainda pendente
 - 🟡 MinIO público por HTTPS/domínio ainda pendente
@@ -72,9 +73,10 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ 7. Fechar backup completo PostgreSQL + MinIO
 - ✅ 8. Adicionar diagnóstico real do pipeline de vídeo
 - ✅ 9. Fortalecer resiliência do worker de vídeo
-- 🟡 10. Publicar backend e mídia por HTTPS estável
-- 🟡 11. Estabilizar OpenAI real para criativos
-- 🔜 12. Implementar integrações sociais live
+- ✅ 10. Evitar quebra de render quando imagem externa retorna 429 ou bloqueio
+- 🟡 11. Publicar backend e mídia por HTTPS estável
+- 🟡 12. Estabilizar OpenAI real para criativos
+- 🔜 13. Implementar integrações sociais live
 
 ## Plano de Segurança
 
@@ -132,6 +134,7 @@ Camada atual:
 - Auditoria mascara tokens, segredos, senhas e emails.
 - `GET /api/diagnostics` exige autenticação e mostra saúde de banco, Redis, storage, OpenAI e worker.
 - `POST /api/diagnostics/run-checks` inclui `video_pipeline` para detectar jobs de vídeo parados, falhas recentes e fila ativa.
+- O renderizador FFmpeg tenta baixar a mídia externa, mas se a fonte responder `429`, bloquear hotlink ou falhar, o job continua com uma imagem fallback local para revisão.
 - Upload de imagem aceita apenas `image/jpeg`, `image/png`, `image/webp` e `image/gif`, com limite de 8 MB.
 - Rotas financeiras e exclusão de anúncio exigem papel `admin`.
 
