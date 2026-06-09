@@ -17,6 +17,8 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - Deploy atual preparado para VM/home lab com systemd, worker contínuo, Redis, PostgreSQL e MinIO.
 - Login em produção validado em `POST /api/auth/login`.
 - Usuário de teste garantido pelo seed: `admin / admin123`.
+- Backup completo testado na VM com PostgreSQL + MinIO.
+- API saudável na VM em `GET /api/health`.
 
 ## Status das Funcionalidades
 
@@ -24,7 +26,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Banco PostgreSQL com Prisma
 - ✅ Schema para produtos, mídias, jobs, posts, comentários e comercial
 - ✅ Autenticação local/JWT
-- ✅ Login público na Vercel corrigido e validado
+- ✅ Login público corrigido e validado no backend próprio
 - ✅ Seeds para teste da plataforma
 - ✅ Fila BullMQ com Redis
 - ✅ Worker FFmpeg para renderização de vídeos
@@ -50,6 +52,8 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Worker de vídeo rodando fora da Vercel em ambiente contínuo
 - ✅ Backup completo de PostgreSQL + MinIO com retenção
 - 🟡 URL pública HTTPS definitiva do backend ainda pendente
+- 🟡 MinIO público por HTTPS/domínio ainda pendente
+- 🟡 OpenAI configurada, mas dependente de quota/billing/rate limit
 - 🔜 Publicação real em redes sociais
 - 🔜 Integração live com Shopee, Mercado Livre, TikTok e Meta
 - 🔜 Webhooks/polling para comentários e respostas automáticas
@@ -58,10 +62,14 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 
 - ✅ 1. Consolidar ambiente de produção
 - ✅ 2. Fechar Redis + storage persistente na VM
-- 🔜 3. Melhorar acompanhamento em tempo real dos jobs
+- ✅ 3. Melhorar acompanhamento em tempo real dos jobs
 - ✅ 4. Fortalecer autenticação e sessão
 - ✅ 5. Revisar CRUDs ponta a ponta
-- 🔜 6. Implementar integrações sociais live
+- ✅ 6. Preparar frontend para API pública do backend na VM
+- ✅ 7. Fechar backup completo PostgreSQL + MinIO
+- 🟡 8. Publicar backend e mídia por HTTPS estável
+- 🟡 9. Estabilizar OpenAI real para criativos
+- 🔜 10. Implementar integrações sociais live
 
 ## Plano de Segurança
 
@@ -78,6 +86,30 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ 11. Bloqueio por tentativas repetidas de login
 - ✅ 12. Sanitização de dados sensíveis em auditoria
 - ✅ 13. Verificação de schema de segurança no banco
+- 🟡 14. Trocar senha da VM e credenciais MinIO usadas durante setup
+- 🟡 15. Colocar API e mídia atrás de HTTPS antes de uso externo real
+- 🔜 16. Adicionar alertas automáticos para falha de backup, worker ou storage
+
+## Roadmap de Produção
+
+- ✅ 1. VM criada e operacional
+- ✅ 2. Docker instalado e validado
+- ✅ 3. PostgreSQL, Redis e MinIO rodando em Docker
+- ✅ 4. Backend rodando via systemd
+- ✅ 5. Worker de vídeo rodando via systemd
+- ✅ 6. Prisma aplicado no banco da VM
+- ✅ 7. Seed com usuário `admin / admin123`
+- ✅ 8. Healthcheck da API validado
+- ✅ 9. Storage S3/MinIO validado para vídeos
+- ✅ 10. Backup completo PostgreSQL + MinIO validado
+- ✅ 11. Frontend preparado para apontar local, VM, tunnel ou API pública
+- 🟡 12. Domínio/tunnel HTTPS definitivo para `API_PUBLIC_URL`
+- 🟡 13. URL pública HTTPS para mídia/MinIO
+- 🟡 14. OpenAI real precisa estabilizar quota/billing/rate limit
+- 🔜 15. Publicação Instagram/Meta live
+- 🔜 16. Publicação TikTok live
+- 🔜 17. Webhooks/polling de comentários
+- 🔜 18. Monitoramento e alertas operacionais
 
 Camada atual:
 
@@ -273,7 +305,7 @@ $env:RUN_SMOKE="true"; npm run --silent check:errors; Remove-Item Env:RUN_SMOKE
 Smoke test contra uma API publicada:
 
 ```bash
-$env:CRUD_CHECK_API_URL="https://auto-media-backend.vercel.app/api"
+$env:CRUD_CHECK_API_URL="https://api.seudominio.com/api"
 $env:CRUD_CHECK_USERNAME="admin"
 $env:CRUD_CHECK_PASSWORD="admin123"
 npm run crud:check
@@ -304,7 +336,7 @@ REDIS_URL="rediss://default:SENHA@HOST:PORT"
 JWT_SECRET="..."
 CORS_ORIGIN="http://localhost:5173,https://auto-media-sooty.vercel.app"
 FRONTEND_URL="https://auto-media-sooty.vercel.app"
-API_PUBLIC_URL="https://auto-media-backend.vercel.app"
+API_PUBLIC_URL="https://api.seudominio.com"
 ```
 
 ### IA
