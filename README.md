@@ -39,6 +39,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Tokens sociais criptografados no banco
 - ✅ Auditoria básica para login, integrações e publicação
 - ✅ Diagnóstico interno de banco, Redis, storage e OpenAI
+- ✅ Diagnóstico do pipeline de vídeo com jobs ativos, travados e falhas recentes
 - ✅ Refresh token com rotação e revogação no banco
 - ✅ Validação forte de upload de imagem por MIME/tamanho
 - ✅ Permissões por papel em rotas sensíveis
@@ -51,6 +52,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Storage persistente com MinIO/S3 na VM
 - ✅ Redis em container Docker na VM para BullMQ
 - ✅ Worker de vídeo rodando fora da Vercel em ambiente contínuo
+- ✅ Worker valida mídia ausente, registra falhas/stalls e limpa temporários após upload
 - ✅ Backup completo de PostgreSQL + MinIO com retenção
 - 🟡 URL pública HTTPS definitiva do backend ainda pendente
 - 🟡 MinIO público por HTTPS/domínio ainda pendente
@@ -68,9 +70,11 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ 5. Revisar CRUDs ponta a ponta
 - ✅ 6. Preparar frontend para API pública do backend na VM
 - ✅ 7. Fechar backup completo PostgreSQL + MinIO
-- 🟡 8. Publicar backend e mídia por HTTPS estável
-- 🟡 9. Estabilizar OpenAI real para criativos
-- 🔜 10. Implementar integrações sociais live
+- ✅ 8. Adicionar diagnóstico real do pipeline de vídeo
+- ✅ 9. Fortalecer resiliência do worker de vídeo
+- 🟡 10. Publicar backend e mídia por HTTPS estável
+- 🟡 11. Estabilizar OpenAI real para criativos
+- 🔜 12. Implementar integrações sociais live
 
 ## Plano de Segurança
 
@@ -127,6 +131,7 @@ Camada atual:
 - Tentativas repetidas de login são registradas e bloqueadas temporariamente.
 - Auditoria mascara tokens, segredos, senhas e emails.
 - `GET /api/diagnostics` exige autenticação e mostra saúde de banco, Redis, storage, OpenAI e worker.
+- `POST /api/diagnostics/run-checks` inclui `video_pipeline` para detectar jobs de vídeo parados, falhas recentes e fila ativa.
 - Upload de imagem aceita apenas `image/jpeg`, `image/png`, `image/webp` e `image/gif`, com limite de 8 MB.
 - Rotas financeiras e exclusão de anúncio exigem papel `admin`.
 
@@ -172,6 +177,14 @@ Para validar Redis e storage persistente em ambiente real:
 ```bash
 npm run infra:check
 ```
+
+Teste público correto da API:
+
+```bash
+curl http://localhost:3333/api/health
+```
+
+Se `GET /api` responder `AUTH_REQUIRED`, isso está correto: a raiz da API é protegida. Use `/api/health` para healthcheck público e rotas privadas com `Authorization: Bearer <token>`.
 
 ### Upstash Redis
 

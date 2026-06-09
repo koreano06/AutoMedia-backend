@@ -23,7 +23,7 @@ type CheckResult = {
   metadata?: Record<string, string | number | boolean | null>;
 };
 
-const availableChecks = ["auth", "database_write", "storage", "queue", "ai", "mock_publish", "latency", "contracts", "permissions"] as const;
+const availableChecks = ["auth", "database_write", "storage", "queue", "ai", "video_pipeline", "mock_publish", "latency", "contracts", "permissions"] as const;
 
 async function timedCheck(id: string, title: string, action: () => Promise<Omit<CheckResult, "id" | "title" | "duration_ms">>): Promise<CheckResult> {
   const start = Date.now();
@@ -81,6 +81,60 @@ function checkStorage() {
 
 function checkOpenAI() {
   return { status: env.OPENAI_API_KEY ? "ok" : "warning", image_model: env.OPENAI_IMAGE_MODEL };
+}
+
+async function checkVideoPipeline(user?: DiagnosticUser) {
+  const staleThreshold = new Date(Date.now() - 15 * 60 * 1000);
+  const recentFailureThreshold = new Date(Date.now() - 60 * 60 * 1000);
+  const workspaceFilter = user?.workspace_id ? { workspaceId: user.workspace_id } : {};
+
+  const [activeCount, staleJobs, recentFailedCount] = await Promise.all([
+    prisma.job.count({
+      where: {
+        ...workspaceFilter,
+        type: "video_generation",
+        status: { in: ["queued", "processing", "rendering", "uploading"] },
+      },
+    }),
+    prisma.job.findMany({
+      where: {
+        ...workspaceFilter,
+        type: "video_generation",
+        status: { in: ["queued", "processing", "rendering", "uploading"] },
+        updatedAt: { lt: staleThreshold },
+      },
+      orderBy: { updatedAt: "asc" },
+      take: 3,
+      select: {
+        id: true,
+        status: true,
+        updatedAt: true,
+        title: true,
+      },
+    }),
+    prisma.job.count({
+      where: {
+        ...workspaceFilter,
+        type: "video_generation",
+        status: "failed",
+        updatedAt: { gte: recentFailureThreshold },
+      },
+    }),
+  ]);
+
+  const status: CheckStatus = staleJobs.length > 0 ? "warning" : "ok";
+
+  return {
+    status,
+    message: staleJobs.length
+      ? `${staleJobs.length} job(s) de vídeo parecem travados há mais de 15 minutos.`
+      : "Pipeline de vídeo sem jobs travados.",
+    active_count: activeCount,
+    stale_count: staleJobs.length,
+    failed_last_hour: recentFailedCount,
+    stale_job_id: staleJobs[0]?.id || null,
+    stale_job_status: staleJobs[0]?.status || null,
+  };
 }
 
 async function runAuthCheck(user?: DiagnosticUser) {
@@ -189,6 +243,24 @@ async function runAICheck() {
   }));
 }
 
+async function runVideoPipelineCheck(user?: DiagnosticUser) {
+  return timedCheck("video_pipeline", "Pipeline de vídeo", async () => {
+    const pipeline = await checkVideoPipeline(user);
+
+    return {
+      status: pipeline.status,
+      message: pipeline.message,
+      metadata: {
+        active_count: pipeline.active_count,
+        stale_count: pipeline.stale_count,
+        failed_last_hour: pipeline.failed_last_hour,
+        stale_job_id: pipeline.stale_job_id,
+        stale_job_status: pipeline.stale_job_status,
+      },
+    };
+  });
+}
+
 async function runMockPublishCheck(user?: DiagnosticUser) {
   return timedCheck("mock_publish", "Publicação simulada", async () => {
     const account = await prisma.platformAccount.findFirst({
@@ -290,6 +362,7 @@ const checkRunners: Record<string, (user?: DiagnosticUser) => Promise<CheckResul
   storage: runStorageCheck,
   queue: runQueueCheck,
   ai: runAICheck,
+  video_pipeline: runVideoPipelineCheck,
   mock_publish: runMockPublishCheck,
   latency: runLatencyCheck,
   contracts: runContractsCheck,
@@ -298,10 +371,10 @@ const checkRunners: Record<string, (user?: DiagnosticUser) => Promise<CheckResul
 
 export const diagnosticsService = {
   async check() {
-    const [database, redis] = await Promise.all([checkDatabase(), checkRedis()]);
+    const [database, redis, videoPipeline] = await Promise.all([checkDatabase(), checkRedis(), checkVideoPipeline()]);
 
     return {
-      status: [database.status, redis.status].includes("error") ? "degraded" : "ok",
+      status: [database.status, redis.status].includes("error") ? "degraded" : videoPipeline.status === "warning" ? "warning" : "ok",
       checked_at: new Date().toISOString(),
       services: {
         database,
@@ -309,8 +382,12 @@ export const diagnosticsService = {
         storage: checkStorage(),
         openai: checkOpenAI(),
         worker: {
-          status: "external",
+          status: videoPipeline.status,
           command: "npm run worker:video",
+          message: videoPipeline.message,
+          active_count: videoPipeline.active_count,
+          stale_count: videoPipeline.stale_count,
+          failed_last_hour: videoPipeline.failed_last_hour,
         },
       },
     };

@@ -17,8 +17,10 @@ const mocks = vi.hoisted(() => ({
   },
   prisma: {
     job: {
+      count: vi.fn(),
       create: vi.fn(),
       delete: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn(),
     },
     platformAccount: {
@@ -38,6 +40,8 @@ describe("diagnosticsService.runChecks", () => {
     vi.clearAllMocks();
     mocks.queueConnection.ping.mockResolvedValue("PONG");
     mocks.prisma.job.create.mockResolvedValue({ id: "job_diag_1" });
+    mocks.prisma.job.count.mockResolvedValue(0);
+    mocks.prisma.job.findMany.mockResolvedValue([]);
     mocks.prisma.job.update.mockResolvedValue({ id: "job_diag_1" });
     mocks.prisma.job.delete.mockResolvedValue({ id: "job_diag_1" });
     mocks.prisma.platformAccount.findFirst.mockResolvedValue({
@@ -80,5 +84,33 @@ describe("diagnosticsService.runChecks", () => {
       status: "warning",
     });
   });
-});
 
+  it("warns when the video pipeline has stale jobs", async () => {
+    mocks.prisma.job.count
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1);
+    mocks.prisma.job.findMany.mockResolvedValueOnce([{
+      id: "job_stale_1",
+      status: "rendering",
+      title: "Render preso",
+      updatedAt: new Date(Date.now() - 20 * 60 * 1000),
+    }]);
+
+    const result = await diagnosticsService.runChecks({ checks: ["video_pipeline"] }, {
+      id: "user_1",
+      role: "admin",
+      workspace_id: "workspace_1",
+    });
+
+    expect(result.status).toBe("warning");
+    expect(result.results[0]).toMatchObject({
+      id: "video_pipeline",
+      status: "warning",
+      metadata: expect.objectContaining({
+        active_count: 2,
+        stale_count: 1,
+        stale_job_id: "job_stale_1",
+      }),
+    });
+  });
+});

@@ -1,10 +1,12 @@
 import { Worker } from "bullmq";
+import { unlink } from "node:fs/promises";
 import { getQueueConnection } from "../../queue/queue.client.js";
 import { jobsRepository } from "../jobs/jobs.repository.js";
 import { mediaRepository } from "../media/media.repository.js";
 import { storageService } from "../../integrations/storage/storage.service.js";
 import { videoRendererService } from "../../integrations/video-rendering/video-renderer.service.js";
 import { VIDEO_GENERATION_QUEUE, type VideoGenerationQueuePayload } from "./video-generation.queue.js";
+import { AppError } from "../../shared/errors/AppError.js";
 
 export function startVideoGenerationWorker() {
   const worker = new Worker<VideoGenerationQueuePayload>(
@@ -12,6 +14,9 @@ export function startVideoGenerationWorker() {
     async (job) => {
       const payload = job.data;
       const asset = await mediaRepository.findById(payload.asset_id);
+      if (!asset) {
+        throw new AppError("Midia de video nao encontrada para renderizacao", 404, "VIDEO_ASSET_NOT_FOUND");
+      }
 
       await jobsRepository.update(payload.job_id, {
         status: "rendering",
@@ -57,6 +62,7 @@ export function startVideoGenerationWorker() {
         key: `rendered-videos/${payload.asset_id}.mp4`,
         contentType: rendered.mime_type,
       });
+      await unlink(rendered.localPath).catch(() => undefined);
 
       const updatedAsset = await mediaRepository.update(payload.asset_id, {
         status: "pending_review",
@@ -102,6 +108,14 @@ export function startVideoGenerationWorker() {
       status: "failed",
       review_notes: error.message,
     });
+  });
+
+  worker.on("stalled", async (jobId) => {
+    console.warn(`[video-worker] Job ${jobId} ficou travado e sera reenfileirado pelo BullMQ.`);
+  });
+
+  worker.on("error", (error) => {
+    console.error("[video-worker] Erro interno do worker:", error);
   });
 
   return worker;
