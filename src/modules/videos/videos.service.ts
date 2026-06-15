@@ -144,6 +144,14 @@ function isInternalStorageUrl(value: string) {
   return candidates.some((candidate) => value.startsWith(candidate.replace(/\/$/, "")));
 }
 
+function isExternalPublicHttpUrl(value?: string) {
+  return typeof value === "string" && isHttpUrl(value) && !isInternalStorageUrl(value);
+}
+
+function shouldUseExternalAiVideoUrl() {
+  return env.AI_VIDEO_PROVIDER === "replicate_kling";
+}
+
 async function cacheRenderMediaUrls(urls: string[], workspaceId: string | undefined, productId: string) {
   const cachedUrls: string[] = [];
   const cacheMetadata = [];
@@ -196,6 +204,8 @@ export const videosService = {
     const renderPlan = buildRenderPlan(payload, renderMediaUrls, script, product.name, product.description);
     const platforms = payload.platforms?.length ? payload.platforms : payload.platform ? [payload.platform] : [];
     const previewUrl = renderMediaUrls[0] || "";
+    const externalAiStartUrl = rawRenderMediaUrls.find(isExternalPublicHttpUrl);
+    const queueSourceUrl = shouldUseExternalAiVideoUrl() ? externalAiStartUrl || previewUrl : previewUrl;
 
     const job = await jobsRepository.create({
       type: "video_generation",
@@ -237,6 +247,7 @@ export const videosService = {
         prompt,
         media_asset_ids: payload.media_asset_ids || [],
         cached_media: mediaCache.cacheMetadata,
+        external_ai_start_url: externalAiStartUrl,
         visual_prompt: payload.visual_prompt,
       },
     });
@@ -251,7 +262,7 @@ export const videosService = {
         job_id: job.id,
         asset_id: asset.id,
         product_name: product.name,
-        source_url: previewUrl,
+        source_url: queueSourceUrl,
         media_urls: renderMediaUrls,
         render_plan: renderPlan,
         script,
@@ -292,6 +303,7 @@ export const videosService = {
         prompt,
         render_plan: renderPlan,
         cached_media: mediaCache.cacheMetadata,
+        external_ai_start_url: externalAiStartUrl,
         media_asset_ids: payload.media_asset_ids || [],
       },
       result: {
