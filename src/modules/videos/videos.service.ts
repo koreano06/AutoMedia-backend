@@ -232,6 +232,7 @@ export const videosService = {
       duration: payload.duration,
       metadata: {
         ai_provider: aiResult.provider,
+        ai_video_provider: env.AI_VIDEO_PROVIDER,
         render_plan: renderPlan,
         prompt,
         media_asset_ids: payload.media_asset_ids || [],
@@ -254,6 +255,7 @@ export const videosService = {
         media_urls: renderMediaUrls,
         render_plan: renderPlan,
         script,
+        ai_prompt: prompt,
         duration: payload.duration,
         ratio: payload.ratio || "9:16",
       });
@@ -286,6 +288,7 @@ export const videosService = {
       payload: {
         asset_id: asset.id,
         ai_provider: aiResult.provider,
+        ai_video_provider: env.AI_VIDEO_PROVIDER,
         prompt,
         render_plan: renderPlan,
         cached_media: mediaCache.cacheMetadata,

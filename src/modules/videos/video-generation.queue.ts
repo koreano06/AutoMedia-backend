@@ -32,6 +32,7 @@ export type VideoGenerationQueuePayload = {
   media_urls?: string[];
   render_plan?: VideoRenderPlan;
   script?: string;
+  ai_prompt?: string;
   duration?: string | number;
   ratio?: string;
 };

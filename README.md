@@ -54,6 +54,7 @@ O backend foi estruturado para atender o frontend React/Vite e preparar o produt
 - ✅ Worker de vídeo rodando fora da Vercel em ambiente contínuo
 - ✅ Worker valida mídia ausente, registra falhas/stalls e limpa temporários após upload
 - ✅ Renderização protegida contra falha de URL externa, incluindo HTTP 429, com fallback visual local
+- ✅ Camada de vídeo IA externo preparada com Replicate/Kling e fallback para FFmpeg
 - ✅ Backup completo de PostgreSQL + MinIO com retenção
 - ✅ Script de deploy da VM com validações, restart e rollback simples
 - ✅ Monitoramento simples de API, Redis, storage e backup recente
@@ -396,6 +397,13 @@ OPENAI_API_KEY=""
 OPENAI_IMAGE_MODEL="gpt-image-1"
 OPENAI_IMAGE_QUALITY="high"
 OPENAI_IMAGE_FALLBACK_ENABLED="false"
+AI_VIDEO_PROVIDER="ffmpeg"
+AI_VIDEO_FALLBACK_TO_FFMPEG="true"
+REPLICATE_API_TOKEN=""
+REPLICATE_KLING_MODEL="kwaivgi/kling-v2.1"
+REPLICATE_KLING_MODE="standard"
+REPLICATE_POLL_INTERVAL_MS="5000"
+REPLICATE_TIMEOUT_MS="420000"
 ```
 
 ### Storage e Vídeo
@@ -448,6 +456,7 @@ Checklist de infraestrutura recomendado para produção:
 - Variáveis `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` são úteis para cache simples, mas BullMQ precisa de `rediss://...`.
 - `STORAGE_DRIVER` deve ser `s3` com MinIO/S3 ou `supabase`.
 - Com MinIO, `S3_PUBLIC_URL` precisa ser acessível pelo navegador para preview dos vídeos.
+- Para geração de vídeo IA via Replicate/Kling, a imagem inicial também precisa estar em URL pública acessível pela internet, não apenas em `localhost` ou `192.168.x.x`.
 - Com Supabase, `SUPABASE_STORAGE_BUCKET` deve existir antes do primeiro render.
 - O bucket precisa ser público ou o backend deve evoluir para gerar URLs assinadas.
 - O worker de vídeo precisa usar as mesmas variáveis `DATABASE_URL`, `REDIS_URL` e storage da API.
@@ -478,10 +487,11 @@ Fluxo atual:
 3. API cria um `Job` e um `MediaAsset`.
 4. Job entra na fila BullMQ `video_generation`.
 5. Worker pega o job, atualiza status para `rendering`.
-6. FFmpeg monta/renderiza o MP4 final usando o plano criativo gerado por IA e os assets disponíveis.
-7. Worker envia o arquivo para storage local, MinIO/S3 ou Supabase.
-8. Mídia final vira `pending_review`.
-9. Usuário aprova e agenda pelo frontend.
+6. Se `AI_VIDEO_PROVIDER=replicate_kling`, o worker tenta gerar o vídeo real por IA a partir da imagem inicial pública do produto.
+7. Se o provedor externo estiver desativado, sem token, sem URL pública ou falhar, o worker usa FFmpeg como fallback seguro.
+8. Worker envia o arquivo final para storage local, MinIO/S3 ou Supabase.
+9. Mídia final vira `pending_review`.
+10. Usuário aprova e agenda pelo frontend.
 
 Situação atual do fluxo:
 
@@ -492,7 +502,8 @@ Situação atual do fluxo:
 - ✅ Execução contínua do worker na VM com systemd
 - ✅ Storage persistente com MinIO/S3 na VM
 - ✅ Feedback granular do job em evolução no frontend
-- 🟡 Geração de vídeo 100% por provedor de IA generativa ainda depende de API externa específica
+- ✅ Provedor externo Replicate/Kling preparado para image-to-video
+- 🟡 Uso real do Replicate/Kling depende de `REPLICATE_API_TOKEN` e URL pública para a imagem inicial
 - 🔜 Publicação social real após aprovação
 
 Estados principais do job:

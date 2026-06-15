@@ -89,7 +89,12 @@ function checkStorage() {
 }
 
 function checkOpenAI() {
-  return { status: env.OPENAI_API_KEY ? "ok" : "warning", image_model: env.OPENAI_IMAGE_MODEL };
+  return {
+    status: env.OPENAI_API_KEY ? "ok" : "warning",
+    image_model: env.OPENAI_IMAGE_MODEL,
+    video_provider: env.AI_VIDEO_PROVIDER,
+    replicate_configured: Boolean(env.REPLICATE_API_TOKEN),
+  };
 }
 
 function logsDir() {
@@ -271,6 +276,9 @@ async function runAICheck() {
       text_model: env.OPENAI_TEXT_MODEL,
       image_model: env.OPENAI_IMAGE_MODEL,
       fallback_enabled: String(env.OPENAI_IMAGE_FALLBACK_ENABLED),
+      video_provider: env.AI_VIDEO_PROVIDER,
+      replicate_configured: Boolean(env.REPLICATE_API_TOKEN),
+      ai_video_fallback_to_ffmpeg: String(env.AI_VIDEO_FALLBACK_TO_FFMPEG),
     },
   }));
 }
@@ -453,6 +461,7 @@ export const diagnosticsService = {
       item("worker", "Worker de vídeo", videoPipeline.status, videoPipeline.message),
       item("backup", "Backup recente", backupAgeHours === null ? "warning" : backupAgeHours > 30 ? "warning" : "ok", backupAgeHours === null ? "Nenhum backup completo encontrado." : `Backup mais recente há ${backupAgeHours.toFixed(1)}h.`),
       item("openai", "OpenAI", env.OPENAI_API_KEY ? "ok" : "warning", env.OPENAI_API_KEY ? `Modelo de imagem: ${env.OPENAI_IMAGE_MODEL}.` : "OPENAI_API_KEY ausente."),
+      item("ai_video", "Vídeo IA", env.AI_VIDEO_PROVIDER === "replicate_kling" && !env.REPLICATE_API_TOKEN ? "warning" : "ok", env.AI_VIDEO_PROVIDER === "replicate_kling" ? `Provider ${env.AI_VIDEO_PROVIDER}, modelo ${env.REPLICATE_KLING_MODEL}.` : "Renderização local FFmpeg ativa."),
       item("https_api", "API pública HTTPS", hasHttpsApi ? "ok" : "warning", hasHttpsApi ? env.API_PUBLIC_URL : "Configure domínio/tunnel HTTPS antes de uso externo real."),
       item("https_frontend", "Frontend HTTPS", hasHttpsFrontend ? "ok" : "warning", hasHttpsFrontend ? env.FRONTEND_URL : "FRONTEND_URL deve ser HTTPS em produção."),
       item("social", "Integrações sociais", env.SOCIAL_INTEGRATIONS_MODE === "live" ? "warning" : "ok", env.SOCIAL_INTEGRATIONS_MODE === "live" ? "Modo live ativo; confirme credenciais e permissões." : "Modo mock seguro para testes."),
