@@ -9,7 +9,21 @@ type ProviderUsage = {
   failed: number;
   fallback: number;
   videos: number;
-  estimated_cost_usd: number | null;
+  estimated_cost_usd: number;
+};
+
+type RecentVideoUsage = {
+  id: string;
+  title: string | null;
+  product_name: string | null;
+  status: string;
+  provider: string;
+  model?: string;
+  duration_seconds: number | null;
+  estimated_cost_usd: number;
+  cost_source: "configured_estimate" | "free_local" | "unknown";
+  url: string | null;
+  created_at: string;
 };
 
 function periodStart(kind: "day" | "week" | "month") {
@@ -42,6 +56,15 @@ function readString(value: unknown) {
   return typeof value === "string" ? value : undefined;
 }
 
+function readNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(",", ".").replace(/[^\d.]/g, ""));
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
 function providerFromJob(job: { result: unknown; payload: unknown }) {
   const result = readRecord(job.result);
   const payload = readRecord(job.payload);
@@ -71,6 +94,42 @@ function providerFromMedia(asset: { source: string | null; metadata: unknown }) 
   };
 }
 
+function durationFromMedia(asset: { duration: string | null; metadata: unknown }) {
+  const metadata = readRecord(asset.metadata);
+  const aiVideo = readRecord(metadata.ai_video);
+  const duration = readNumber(aiVideo.duration_seconds)
+    || readNumber(aiVideo.duration)
+    || readNumber(metadata.duration_seconds)
+    || readNumber(asset.duration);
+
+  return duration ? Math.round(duration) : null;
+}
+
+function estimatedVideoCost(provider: string, durationSeconds: number | null) {
+  if (provider === "replicate_kling") {
+    const cost = durationSeconds && durationSeconds > 5
+      ? env.AI_VIDEO_COST_REPLICATE_KLING_10S_USD
+      : env.AI_VIDEO_COST_REPLICATE_KLING_5S_USD;
+
+    return {
+      cost,
+      source: "configured_estimate" as const,
+    };
+  }
+
+  if (provider === "ffmpeg" || provider === "ffmpeg_fallback") {
+    return {
+      cost: env.AI_VIDEO_COST_FFMPEG_USD,
+      source: "free_local" as const,
+    };
+  }
+
+  return {
+    cost: 0,
+    source: "unknown" as const,
+  };
+}
+
 function upsertProvider(map: Map<string, ProviderUsage>, provider: string, model?: string) {
   const key = `${provider}:${model || "default"}`;
   const current = map.get(key);
@@ -84,7 +143,7 @@ function upsertProvider(map: Map<string, ProviderUsage>, provider: string, model
     failed: 0,
     fallback: 0,
     videos: 0,
-    estimated_cost_usd: null,
+    estimated_cost_usd: 0,
   };
   map.set(key, created);
   return created;
@@ -125,6 +184,9 @@ async function usageForPeriod(workspaceId: string | undefined, since: Date) {
         source: true,
         metadata: true,
         url: true,
+        title: true,
+        productName: true,
+        duration: true,
         createdAt: true,
       },
       orderBy: { createdAt: "desc" },
@@ -146,12 +208,42 @@ async function usageForPeriod(workspaceId: string | undefined, since: Date) {
   for (const asset of mediaAssets) {
     const info = providerFromMedia(asset);
     const usage = upsertProvider(providers, info.provider, info.model);
+    const durationSeconds = durationFromMedia(asset);
+    const estimatedCost = estimatedVideoCost(info.provider, durationSeconds);
     usage.videos += 1;
+    usage.estimated_cost_usd += estimatedCost.cost;
   }
 
   const completed = jobs.filter((job) => job.status === "completed").length;
   const failed = jobs.filter((job) => job.status === "failed").length;
   const fallback = jobs.filter((job) => Boolean(readRecord(job.payload).ai_video_fallback_reason)).length;
+  const providerList = [...providers.values()]
+    .map((provider) => ({
+      ...provider,
+      estimated_cost_usd: Number(provider.estimated_cost_usd.toFixed(4)),
+    }))
+    .sort((a, b) => b.requests + b.videos - (a.requests + a.videos));
+
+  const recentVideos: RecentVideoUsage[] = mediaAssets.slice(0, 20).map((asset) => {
+    const info = providerFromMedia(asset);
+    const durationSeconds = durationFromMedia(asset);
+    const estimatedCost = estimatedVideoCost(info.provider, durationSeconds);
+
+    return {
+      id: asset.id,
+      title: asset.title,
+      product_name: asset.productName,
+      status: asset.status,
+      provider: info.provider,
+      model: info.model,
+      duration_seconds: durationSeconds,
+      estimated_cost_usd: Number(estimatedCost.cost.toFixed(4)),
+      cost_source: estimatedCost.source,
+      url: asset.url,
+      created_at: asset.createdAt.toISOString(),
+    };
+  });
+  const estimatedCostTotal = providerList.reduce((sum, provider) => sum + provider.estimated_cost_usd, 0);
 
   return {
     since: since.toISOString(),
@@ -160,7 +252,9 @@ async function usageForPeriod(workspaceId: string | undefined, since: Date) {
     failed,
     fallback,
     videos: mediaAssets.length,
-    providers: [...providers.values()].sort((a, b) => b.requests + b.videos - (a.requests + a.videos)),
+    estimated_cost_usd: Number(estimatedCostTotal.toFixed(4)),
+    providers: providerList,
+    recent_videos: recentVideos,
   };
 }
 
