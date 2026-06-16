@@ -20,6 +20,7 @@ import { registerReportsRoutes } from "./modules/reports/reports.routes.js";
 import { registerCommercialRoutes } from "./modules/commercial/commercial.routes.js";
 import { registerUploadsRoutes } from "./modules/media/uploads.routes.js";
 import { registerAIRoutes } from "./modules/ai/ai.routes.js";
+import { registerAIUsageRoutes } from "./modules/ai-usage/ai-usage.routes.js";
 import { registerMetaRoutes } from "./modules/meta/meta.routes.js";
 import { registerMarketplaceListingsRoutes } from "./modules/marketplace-listings/marketplace-listings.routes.js";
 import { registerMarketplaceSearchRoutes } from "./modules/marketplace-search/marketplace-search.routes.js";
@@ -160,6 +161,7 @@ export function buildApp() {
     api.register(registerMarketplaceSearchRoutes, { prefix: "/marketplace-search" });
     api.register(registerFinanceRoutes, { prefix: "/finance" });
     api.register(registerDiagnosticsRoutes, { prefix: "/diagnostics" });
+    api.register(registerAIUsageRoutes, { prefix: "/ai-usage" });
     api.post("/post-publish-now", async (request) => {
       assertAdmin(request);
       const { id } = request.body as { id: string };
