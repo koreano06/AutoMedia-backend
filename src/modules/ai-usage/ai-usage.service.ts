@@ -9,7 +9,8 @@ type ProviderUsage = {
   failed: number;
   fallback: number;
   videos: number;
-  estimated_cost_usd: number;
+  official_cost_usd: number | null;
+  cost_source: "official_api" | "free_local" | "unavailable";
 };
 
 type RecentVideoUsage = {
@@ -20,10 +21,17 @@ type RecentVideoUsage = {
   provider: string;
   model?: string;
   duration_seconds: number | null;
-  estimated_cost_usd: number;
-  cost_source: "configured_estimate" | "free_local" | "unknown";
+  official_cost_usd: number | null;
+  cost_source: "official_api" | "free_local" | "unavailable";
+  cost_message: string;
   url: string | null;
   created_at: string;
+};
+
+type OfficialBilling = {
+  openai_cost_usd: number | null;
+  openai_status: "available" | "not_configured" | "error";
+  openai_message: string;
 };
 
 function periodStart(kind: "day" | "week" | "month") {
@@ -105,28 +113,19 @@ function durationFromMedia(asset: { duration: string | null; metadata: unknown }
   return duration ? Math.round(duration) : null;
 }
 
-function estimatedVideoCost(provider: string, durationSeconds: number | null) {
-  if (provider === "replicate_kling") {
-    const cost = durationSeconds && durationSeconds > 5
-      ? env.AI_VIDEO_COST_REPLICATE_KLING_10S_USD
-      : env.AI_VIDEO_COST_REPLICATE_KLING_5S_USD;
-
-    return {
-      cost,
-      source: "configured_estimate" as const,
-    };
-  }
-
+function officialVideoCost(provider: string) {
   if (provider === "ffmpeg" || provider === "ffmpeg_fallback") {
     return {
-      cost: env.AI_VIDEO_COST_FFMPEG_USD,
+      cost: 0,
       source: "free_local" as const,
+      message: "Render local com FFmpeg, sem custo de API externa.",
     };
   }
 
   return {
-    cost: 0,
-    source: "unknown" as const,
+    cost: null,
+    source: "unavailable" as const,
+    message: "Custo oficial por video ainda nao disponivel pela API conectada.",
   };
 }
 
@@ -143,13 +142,69 @@ function upsertProvider(map: Map<string, ProviderUsage>, provider: string, model
     failed: 0,
     fallback: 0,
     videos: 0,
-    estimated_cost_usd: 0,
+    official_cost_usd: null,
+    cost_source: provider === "ffmpeg" || provider === "ffmpeg_fallback" ? "free_local" : "unavailable",
   };
   map.set(key, created);
   return created;
 }
 
-async function usageForPeriod(workspaceId: string | undefined, since: Date) {
+async function fetchOpenAICosts(since: Date): Promise<OfficialBilling> {
+  const apiKey = env.OPENAI_ADMIN_API_KEY;
+  if (!apiKey) {
+    return {
+      openai_cost_usd: null,
+      openai_status: "not_configured",
+      openai_message: "OPENAI_ADMIN_API_KEY nao configurada. Custos oficiais da OpenAI indisponiveis.",
+    };
+  }
+
+  const url = new URL("https://api.openai.com/v1/organization/costs");
+  url.searchParams.set("start_time", String(Math.floor(since.getTime() / 1000)));
+  url.searchParams.set("end_time", String(Math.floor(Date.now() / 1000)));
+  url.searchParams.set("bucket_width", "1d");
+  url.searchParams.set("limit", "180");
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      return {
+        openai_cost_usd: null,
+        openai_status: "error",
+        openai_message: `OpenAI Costs API retornou status ${response.status}. Verifique se a chave e admin da organizacao.`,
+      };
+    }
+
+    const payload = await response.json() as { data?: Array<{ results?: Array<{ amount?: { currency?: string; value?: number } }> }> };
+    const total = (payload.data || []).reduce((bucketSum, bucket) => {
+      const resultSum = (bucket.results || []).reduce((sum, result) => {
+        if (result.amount?.currency && result.amount.currency !== "usd") return sum;
+        return sum + (typeof result.amount?.value === "number" ? result.amount.value : 0);
+      }, 0);
+
+      return bucketSum + resultSum;
+    }, 0);
+
+    return {
+      openai_cost_usd: Number(total.toFixed(6)),
+      openai_status: "available",
+      openai_message: "Custo oficial retornado pela OpenAI Costs API.",
+    };
+  } catch {
+    return {
+      openai_cost_usd: null,
+      openai_status: "error",
+      openai_message: "Nao foi possivel consultar a OpenAI Costs API neste momento.",
+    };
+  }
+}
+
+async function usageForPeriod(workspaceId: string | undefined, since: Date, billing: OfficialBilling) {
   const where = {
     ...(workspaceId ? { workspaceId } : {}),
     createdAt: { gte: since },
@@ -208,26 +263,30 @@ async function usageForPeriod(workspaceId: string | undefined, since: Date) {
   for (const asset of mediaAssets) {
     const info = providerFromMedia(asset);
     const usage = upsertProvider(providers, info.provider, info.model);
-    const durationSeconds = durationFromMedia(asset);
-    const estimatedCost = estimatedVideoCost(info.provider, durationSeconds);
+    const cost = officialVideoCost(info.provider);
     usage.videos += 1;
-    usage.estimated_cost_usd += estimatedCost.cost;
+    if (cost.source === "free_local") {
+      usage.official_cost_usd = 0;
+      usage.cost_source = "free_local";
+    }
+  }
+
+  if (providers.has(`openai:${env.OPENAI_TEXT_MODEL}`) || billing.openai_cost_usd !== null) {
+    const openaiUsage = upsertProvider(providers, "openai", env.OPENAI_TEXT_MODEL);
+    openaiUsage.official_cost_usd = billing.openai_cost_usd;
+    openaiUsage.cost_source = billing.openai_status === "available" ? "official_api" : "unavailable";
   }
 
   const completed = jobs.filter((job) => job.status === "completed").length;
   const failed = jobs.filter((job) => job.status === "failed").length;
   const fallback = jobs.filter((job) => Boolean(readRecord(job.payload).ai_video_fallback_reason)).length;
   const providerList = [...providers.values()]
-    .map((provider) => ({
-      ...provider,
-      estimated_cost_usd: Number(provider.estimated_cost_usd.toFixed(4)),
-    }))
     .sort((a, b) => b.requests + b.videos - (a.requests + a.videos));
 
   const recentVideos: RecentVideoUsage[] = mediaAssets.slice(0, 20).map((asset) => {
     const info = providerFromMedia(asset);
     const durationSeconds = durationFromMedia(asset);
-    const estimatedCost = estimatedVideoCost(info.provider, durationSeconds);
+    const officialCost = officialVideoCost(info.provider);
 
     return {
       id: asset.id,
@@ -237,13 +296,14 @@ async function usageForPeriod(workspaceId: string | undefined, since: Date) {
       provider: info.provider,
       model: info.model,
       duration_seconds: durationSeconds,
-      estimated_cost_usd: Number(estimatedCost.cost.toFixed(4)),
-      cost_source: estimatedCost.source,
+      official_cost_usd: officialCost.cost,
+      cost_source: officialCost.source,
+      cost_message: officialCost.message,
       url: asset.url,
       created_at: asset.createdAt.toISOString(),
     };
   });
-  const estimatedCostTotal = providerList.reduce((sum, provider) => sum + provider.estimated_cost_usd, 0);
+  const officialCostTotal = providerList.reduce((sum, provider) => sum + (provider.official_cost_usd || 0), 0);
 
   return {
     since: since.toISOString(),
@@ -252,7 +312,13 @@ async function usageForPeriod(workspaceId: string | undefined, since: Date) {
     failed,
     fallback,
     videos: mediaAssets.length,
-    estimated_cost_usd: Number(estimatedCostTotal.toFixed(4)),
+    official_cost_usd: Number(officialCostTotal.toFixed(6)),
+    billing_status: {
+      openai: billing.openai_status,
+      openai_message: billing.openai_message,
+      replicate: "unavailable",
+      replicate_message: "A Replicate nao expoe custo oficial consolidado no fluxo atual; videos mostram uso real, mas custo fica indisponivel.",
+    },
     providers: providerList,
     recent_videos: recentVideos,
   };
@@ -260,10 +326,18 @@ async function usageForPeriod(workspaceId: string | undefined, since: Date) {
 
 export const aiUsageService = {
   async summary(workspaceId?: string) {
+    const dayStart = periodStart("day");
+    const weekStart = periodStart("week");
+    const monthStart = periodStart("month");
+    const [dayBilling, weekBilling, monthBilling] = await Promise.all([
+      fetchOpenAICosts(dayStart),
+      fetchOpenAICosts(weekStart),
+      fetchOpenAICosts(monthStart),
+    ]);
     const [day, week, month] = await Promise.all([
-      usageForPeriod(workspaceId, periodStart("day")),
-      usageForPeriod(workspaceId, periodStart("week")),
-      usageForPeriod(workspaceId, periodStart("month")),
+      usageForPeriod(workspaceId, dayStart, dayBilling),
+      usageForPeriod(workspaceId, weekStart, weekBilling),
+      usageForPeriod(workspaceId, monthStart, monthBilling),
     ]);
 
     return {
@@ -275,8 +349,8 @@ export const aiUsageService = {
           configured: Boolean(env.OPENAI_API_KEY),
           text_model: env.OPENAI_TEXT_MODEL,
           image_model: env.OPENAI_IMAGE_MODEL,
-          credit_status: "manual",
-          credit_message: "A API usada no projeto não expõe saldo de créditos de forma confiável. Consulte o painel da OpenAI.",
+          credit_status: monthBilling.openai_status,
+          credit_message: monthBilling.openai_message,
         },
         {
           id: "replicate_kling",
@@ -284,8 +358,8 @@ export const aiUsageService = {
           configured: Boolean(env.REPLICATE_API_TOKEN),
           video_model: env.REPLICATE_KLING_MODEL,
           mode: env.REPLICATE_KLING_MODE,
-          credit_status: "manual",
-          credit_message: "Consulte saldo e cobranças no painel da Replicate.",
+          credit_status: "unavailable",
+          credit_message: "Uso operacional real disponivel. Custo oficial consolidado nao esta disponivel via API no fluxo atual.",
         },
       ],
       periods: {
