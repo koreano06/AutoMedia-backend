@@ -20,7 +20,7 @@ export async function registerJobsRoutes(app: FastifyInstance) {
 
   app.post("/:id/retry", async (request) => {
     const { id } = request.params as { id: string };
-    return jobsService.retry(id, request.user?.workspace_id);
+    return jobsService.retry(id, request.user?.workspace_id, request.user?.id);
   });
 
   app.delete("/:id", async (request) => {

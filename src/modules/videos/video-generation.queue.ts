@@ -3,6 +3,7 @@ import { enqueueJob } from "../../queue/queue.client.js";
 export const VIDEO_GENERATION_QUEUE = "video_generation";
 
 export type VideoRenderScene = {
+  id?: string;
   order: number;
   type: "hook" | "benefit" | "proof" | "cta" | "detail";
   duration_seconds: number;
@@ -24,13 +25,28 @@ export type VideoRenderPlan = {
   script: string;
 };
 
+export type VideoCostEstimate = {
+  provider: string;
+  model?: string;
+  currency: "USD";
+  estimated_cost_usd: number;
+  estimated_cost_per_segment_usd: number;
+  ffmpeg_cost_usd?: number;
+  duration_seconds: number;
+  segments: number;
+  source: "configured_estimate" | "not_configured";
+};
+
 export type VideoGenerationQueuePayload = {
   job_id: string;
   asset_id: string;
+  requested_by_user_id?: string;
   product_name?: string;
   source_url?: string;
   media_urls?: string[];
   render_plan?: VideoRenderPlan;
+  scene_plan?: VideoRenderPlan;
+  cost_estimate?: VideoCostEstimate;
   script?: string;
   ai_prompt?: string;
   duration?: string | number;

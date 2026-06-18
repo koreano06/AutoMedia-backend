@@ -17,9 +17,13 @@ const mocks = vi.hoisted(() => ({
     findById: vi.fn(),
   },
   enqueueVideoGeneration: vi.fn(),
+  auditService: {
+    log: vi.fn(),
+  },
 }));
 
 vi.mock("./jobs.repository.js", () => ({ jobsRepository: mocks.jobsRepository }));
+vi.mock("../audit/audit.service.js", () => ({ auditService: mocks.auditService }));
 vi.mock("../media/media.repository.js", () => ({ mediaRepository: mocks.mediaRepository }));
 vi.mock("../products/products.repository.js", () => ({ productsRepository: mocks.productsRepository }));
 vi.mock("../videos/video-generation.queue.js", () => ({ enqueueVideoGeneration: mocks.enqueueVideoGeneration }));

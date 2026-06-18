@@ -2,6 +2,7 @@ import { jobsRepository } from "../jobs/jobs.repository.js";
 import { mediaRepository } from "./media.repository.js";
 import type { MediaAsset } from "../../shared/types/domain.js";
 import { AppError } from "../../shared/errors/AppError.js";
+import { auditService } from "../audit/audit.service.js";
 
 export const mediaService = {
   list(query: { order?: string; limit?: number; type?: string; status?: string; product_id?: string; workspace_id?: string }) {
@@ -12,15 +13,32 @@ export const mediaService = {
       : mediaRepository.list(order, limit);
   },
 
-  create(payload: Partial<MediaAsset>, workspaceId?: string) {
-    return mediaRepository.create({ status: payload.status || "collected", type: payload.type || "image", workspace_id: workspaceId, ...payload });
+  async create(payload: Partial<MediaAsset>, workspaceId?: string, actorId?: string) {
+    const asset = await mediaRepository.create({ status: payload.status || "collected", type: payload.type || "image", workspace_id: workspaceId, ...payload });
+    await auditService.log({
+      actor_id: actorId,
+      action: "media.create",
+      entity_type: "media_asset",
+      entity_id: asset.id,
+      after: asset,
+    });
+    return asset;
   },
 
-  async update(id: string, payload: Partial<MediaAsset>, workspaceId?: string) {
+  async update(id: string, payload: Partial<MediaAsset>, workspaceId?: string, actorId?: string) {
     const asset = await mediaRepository.findById(id);
     if (!asset) throw new AppError("Mídia não encontrada", 404, "MEDIA_NOT_FOUND");
     if (workspaceId && asset.workspace_id && asset.workspace_id !== workspaceId) throw new AppError("Mídia não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
-    return mediaRepository.update(id, payload);
+    const updated = await mediaRepository.update(id, payload);
+    await auditService.log({
+      actor_id: actorId,
+      action: payload.status && payload.status !== asset.status ? `media.status.${payload.status}` : "media.update",
+      entity_type: "media_asset",
+      entity_id: id,
+      before: asset,
+      after: updated,
+    });
+    return updated;
   },
 
   async collect(payload: { product_id: string; query?: string; sources: string[] }, workspaceId?: string) {

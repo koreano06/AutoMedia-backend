@@ -10,6 +10,7 @@ import { VIDEO_GENERATION_QUEUE, type VideoGenerationQueuePayload } from "./vide
 import { AppError } from "../../shared/errors/AppError.js";
 import type { AIVideoResult } from "../../integrations/ai-video/ai-video.types.js";
 import type { VideoRenderPlan, VideoRenderScene } from "./video-generation.queue.js";
+import { auditService } from "../audit/audit.service.js";
 
 function secondsFromDuration(duration?: string | number) {
   if (typeof duration === "number") return Math.max(5, duration);
@@ -104,6 +105,38 @@ function segmentRenderPlan(renderPlan: VideoRenderPlan | undefined, segmentIndex
   };
 }
 
+function withPayloadStage(payload: VideoGenerationQueuePayload, stage: string, extra: Record<string, unknown> = {}) {
+  return {
+    ...payload,
+    ai_video_stage: stage,
+    ...extra,
+  };
+}
+
+function buildCostRecord(input: {
+  payload: VideoGenerationQueuePayload;
+  provider: string;
+  model?: string;
+  segments: number;
+  durationSeconds: number;
+  fallback?: boolean;
+}) {
+  const estimate = input.payload.cost_estimate;
+  const estimatedCost = estimate?.estimated_cost_usd ?? 0;
+
+  return {
+    provider: input.provider,
+    model: input.model || estimate?.model,
+    currency: estimate?.currency || "USD",
+    estimated_cost_usd: estimatedCost,
+    estimated_cost_per_segment_usd: estimate?.estimated_cost_per_segment_usd ?? 0,
+    duration_seconds: input.durationSeconds,
+    segments: input.segments,
+    fallback: Boolean(input.fallback),
+    source: estimatedCost > 0 ? estimate?.source || "configured_estimate" : "not_configured",
+  };
+}
+
 export function startVideoGenerationWorker() {
   const worker = new Worker<VideoGenerationQueuePayload>(
     VIDEO_GENERATION_QUEUE,
@@ -117,7 +150,7 @@ export function startVideoGenerationWorker() {
       await jobsRepository.update(payload.job_id, {
         status: "rendering",
         progress: 35,
-        payload,
+        payload: withPayloadStage(payload, "creating_scene_plan"),
       });
 
       await mediaRepository.update(payload.asset_id, {
@@ -128,11 +161,8 @@ export function startVideoGenerationWorker() {
         try {
           await jobsRepository.update(payload.job_id, {
             status: "rendering",
-            progress: 45,
-            payload: {
-              ...payload,
-              ai_video_stage: "external_generation",
-            },
+              progress: 45,
+            payload: withPayloadStage(payload, "external_generation"),
           });
 
           const requestedSeconds = secondsFromDuration(payload.duration);
@@ -144,12 +174,11 @@ export function startVideoGenerationWorker() {
             await jobsRepository.update(payload.job_id, {
               status: "rendering",
               progress: segmentProgress,
-              payload: {
-                ...payload,
-                ai_video_stage: "external_generation",
+              payload: withPayloadStage(payload, "external_generation", {
                 ai_video_segments_total: segmentDurations.length,
                 ai_video_segment_current: index + 1,
-              },
+                ai_video_segment_label: `Gerando segmento ${index + 1}/${segmentDurations.length}`,
+              }),
             });
 
             const aiVideo = await aiVideoService.generate({
@@ -173,8 +202,11 @@ export function startVideoGenerationWorker() {
           }
 
           await jobsRepository.update(payload.job_id, {
-            status: "uploading",
+            status: segmentDurations.length > 1 ? "rendering" : "uploading",
             progress: segmentDurations.length > 1 ? 82 : 86,
+            payload: withPayloadStage(payload, segmentDurations.length > 1 ? "concatenating_segments" : "uploading_to_library", {
+              ai_video_segments_total: segmentDurations.length,
+            }),
           });
 
           const totalDuration = aiVideos.reduce((total, video) => total + (video.duration_seconds || 0), 0) || requestedSeconds;
@@ -205,6 +237,22 @@ export function startVideoGenerationWorker() {
               fallbackName: `${payload.asset_id}.mp4`,
             });
 
+          await jobsRepository.update(payload.job_id, {
+            status: "uploading",
+            progress: 90,
+            payload: withPayloadStage(payload, "uploading_to_library", {
+              ai_video_segments_total: segmentDurations.length,
+            }),
+          });
+
+          const cost = buildCostRecord({
+            payload,
+            provider: aiVideos[0].provider,
+            model: aiVideos[0].model,
+            segments: aiVideos.length,
+            durationSeconds: totalDuration,
+          });
+
           const updatedAsset = await mediaRepository.update(payload.asset_id, {
             status: "pending_review",
             source: "Replicate Kling AI",
@@ -219,6 +267,7 @@ export function startVideoGenerationWorker() {
               ai_video: {
                 provider: aiVideos[0].provider,
                 model: aiVideos[0].model,
+                cost,
                 prediction_id: aiVideos.map((video) => video.prediction_id).filter(Boolean).join(","),
                 remote_output_url: aiVideos.length === 1 ? aiVideos[0].output_url : undefined,
                 segments: aiVideos.map((video, index) => ({
@@ -232,6 +281,8 @@ export function startVideoGenerationWorker() {
                 final_duration_seconds: totalDuration,
                 concatenated_with_ffmpeg: aiVideos.length > 1,
               },
+              cost,
+              scene_plan: payload.scene_plan || payload.render_plan,
             },
           });
 
@@ -247,9 +298,26 @@ export function startVideoGenerationWorker() {
               url: upload.url,
               ai_video_provider: aiVideos[0].provider,
               ai_video_model: aiVideos[0].model,
+              cost,
               prediction_id: aiVideos.map((video) => video.prediction_id).filter(Boolean).join(","),
               ai_video_segments: aiVideos.length,
               final_duration_seconds: totalDuration,
+            },
+          });
+
+          await auditService.log({
+            actor_id: payload.requested_by_user_id,
+            action: "video.generate.completed",
+            entity_type: "media_asset",
+            entity_id: payload.asset_id,
+            metadata: {
+              job_id: payload.job_id,
+              provider: aiVideos[0].provider,
+              model: aiVideos[0].model,
+              segments: aiVideos.length,
+              duration_seconds: totalDuration,
+              estimated_cost_usd: cost.estimated_cost_usd,
+              fallback: false,
             },
           });
 
@@ -260,10 +328,9 @@ export function startVideoGenerationWorker() {
           await jobsRepository.update(payload.job_id, {
             status: "rendering",
             progress: 40,
-            payload: {
-              ...payload,
+            payload: withPayloadStage(payload, "fallback_ffmpeg", {
               ai_video_fallback_reason: error instanceof Error ? error.message : "Falha no provedor externo de vídeo IA",
-            },
+            }),
           });
         }
       }
@@ -282,6 +349,9 @@ export function startVideoGenerationWorker() {
       await jobsRepository.update(payload.job_id, {
         status: "uploading",
         progress: 82,
+        payload: withPayloadStage(payload, "uploading_to_library", {
+          ai_video_fallback_reason: payload.cost_estimate?.provider === "replicate_kling" ? "Render finalizado pelo FFmpeg" : undefined,
+        }),
       });
 
       if ("mock" in rendered && rendered.mock) {
@@ -312,6 +382,27 @@ export function startVideoGenerationWorker() {
         mime_type: rendered.mime_type,
         duration: String(rendered.duration),
         quality_score: 86,
+        metadata: {
+          ...(asset.metadata && typeof asset.metadata === "object" ? asset.metadata : {}),
+          cost: buildCostRecord({
+            payload,
+            provider: "ffmpeg",
+            model: "ffmpeg",
+            segments: 1,
+            durationSeconds: Number(rendered.duration || secondsFromDuration(payload.duration)),
+            fallback: Boolean(payload.cost_estimate?.provider === "replicate_kling"),
+          }),
+          scene_plan: payload.scene_plan || payload.render_plan,
+        },
+      });
+
+      const fallbackCost = buildCostRecord({
+        payload,
+        provider: "ffmpeg",
+        model: "ffmpeg",
+        segments: 1,
+        durationSeconds: Number(rendered.duration || secondsFromDuration(payload.duration)),
+        fallback: Boolean(payload.cost_estimate?.provider === "replicate_kling"),
       });
 
       await jobsRepository.update(payload.job_id, {
@@ -326,6 +417,22 @@ export function startVideoGenerationWorker() {
           url: upload.url,
           width: rendered.width,
           height: rendered.height,
+          cost: fallbackCost,
+          fallback: fallbackCost.fallback,
+        },
+      });
+
+      await auditService.log({
+        actor_id: payload.requested_by_user_id,
+        action: "video.generate.completed",
+        entity_type: "media_asset",
+        entity_id: payload.asset_id,
+        metadata: {
+          job_id: payload.job_id,
+          provider: "ffmpeg",
+          duration_seconds: rendered.duration,
+          fallback: fallbackCost.fallback,
+          estimated_cost_usd: fallbackCost.estimated_cost_usd,
         },
       });
 
@@ -347,6 +454,17 @@ export function startVideoGenerationWorker() {
     await mediaRepository.update(payload.asset_id, {
       status: "failed",
       review_notes: error.message,
+    });
+
+    await auditService.log({
+      actor_id: payload.requested_by_user_id,
+      action: "video.generate.failed",
+      entity_type: "job",
+      entity_id: payload.job_id,
+      metadata: {
+        asset_id: payload.asset_id,
+        error: error.message,
+      },
     });
   });
 

@@ -6,7 +6,8 @@ import { env } from "../../config/env.js";
 import { storageService } from "../../integrations/storage/storage.service.js";
 import { AppError } from "../../shared/errors/AppError.js";
 import type { GenerateVideoInput } from "./videos.schemas.js";
-import { enqueueVideoGeneration, type VideoRenderPlan, type VideoRenderScene } from "./video-generation.queue.js";
+import { enqueueVideoGeneration, type VideoCostEstimate, type VideoRenderPlan, type VideoRenderScene } from "./video-generation.queue.js";
+import { auditService } from "../audit/audit.service.js";
 
 function buildVideoPrompt(input: GenerateVideoInput, productName: string, productDescription?: string, mediaTitles: string[] = []) {
   const briefing = input.briefing_fields || {};
@@ -120,12 +121,51 @@ function buildRenderPlan(input: GenerateVideoInput, mediaUrls: string[], script:
     audio: input.audio || "Música tendência",
     brand: "AutoMedia",
     scenes: sceneTexts.map((scene, index) => ({
+      id: `scene_${index + 1}`,
       ...scene,
       order: index + 1,
       duration_seconds: durations[index] || 4,
       source: mediaUrls[index] || fallbackSource,
     })),
     script,
+  };
+}
+
+function buildScenePlan(renderPlan: VideoRenderPlan, mediaTitles: string[]) {
+  return {
+    ...renderPlan,
+    scenes: renderPlan.scenes.map((scene, index) => ({
+      ...scene,
+      reference_asset_title: mediaTitles[index] || mediaTitles[0] || "Imagem principal do anúncio",
+      locked_instruction: [
+        `Cena ${scene.order}: ${scene.headline}.`,
+        scene.subheadline ? `Subtexto: ${scene.subheadline}.` : "",
+        scene.instruction ? `Direção: ${scene.instruction}` : "",
+        "Manter o mesmo produto, iluminação, cenário e identidade visual do início ao fim.",
+      ].filter(Boolean).join(" "),
+    })),
+  };
+}
+
+function estimateVideoCost(duration: string | number | undefined): VideoCostEstimate {
+  const durationSeconds = secondsFromDuration(duration);
+  const segments = Math.max(1, Math.ceil(durationSeconds / 10));
+  const perSegment = env.AI_VIDEO_PROVIDER === "replicate_kling" ? env.AI_VIDEO_SEGMENT_ESTIMATED_COST_USD : 0;
+  const ffmpegCost = env.AI_VIDEO_FFMPEG_ESTIMATED_COST_USD;
+  const estimated = env.AI_VIDEO_PROVIDER === "replicate_kling"
+    ? Number((segments * perSegment).toFixed(4))
+    : Number(ffmpegCost.toFixed(4));
+
+  return {
+    provider: env.AI_VIDEO_PROVIDER,
+    model: env.AI_VIDEO_PROVIDER === "replicate_kling" ? env.REPLICATE_KLING_MODEL : "ffmpeg",
+    currency: "USD",
+    estimated_cost_usd: estimated,
+    estimated_cost_per_segment_usd: perSegment,
+    ffmpeg_cost_usd: ffmpegCost,
+    duration_seconds: durationSeconds,
+    segments,
+    source: estimated > 0 ? "configured_estimate" : "not_configured",
   };
 }
 
@@ -186,7 +226,7 @@ async function cacheRenderMediaUrls(urls: string[], workspaceId: string | undefi
 }
 
 export const videosService = {
-  async generate(payload: GenerateVideoInput, workspaceId?: string) {
+  async generate(payload: GenerateVideoInput, workspaceId?: string, actorId?: string) {
     const product = await productsRepository.findById(payload.product_id);
     if (!product) throw new AppError("Anúncio base não encontrado para geração de vídeo", 404, "AD_NOT_FOUND");
 
@@ -202,6 +242,8 @@ export const videosService = {
     const mediaCache = await cacheRenderMediaUrls(rawRenderMediaUrls, workspaceId || product.workspace_id, product.id);
     const renderMediaUrls = mediaCache.urls;
     const renderPlan = buildRenderPlan(payload, renderMediaUrls, script, product.name, product.description);
+    const scenePlan = buildScenePlan(renderPlan, mediaTitles);
+    const costEstimate = estimateVideoCost(payload.duration);
     const platforms = payload.platforms?.length ? payload.platforms : payload.platform ? [payload.platform] : [];
     const previewUrl = renderMediaUrls[0] || "";
     const externalAiStartUrl = rawRenderMediaUrls.find(isExternalPublicHttpUrl);
@@ -216,6 +258,9 @@ export const videosService = {
       progress: 0,
       payload: {
         product_id: product.id,
+        product_name: product.name,
+        requested_by_user_id: actorId,
+        ai_video_stage: "queued",
         template: payload.template || payload.style,
         format: payload.format || "reels",
         ratio: payload.ratio || "9:16",
@@ -223,6 +268,9 @@ export const videosService = {
         platform: payload.platform,
         platforms,
         media_asset_ids: payload.media_asset_ids || [],
+        reference_image_urls: renderMediaUrls,
+        scene_plan: scenePlan,
+        cost_estimate: costEstimate,
       },
     });
 
@@ -243,12 +291,30 @@ export const videosService = {
       metadata: {
         ai_provider: aiResult.provider,
         ai_video_provider: env.AI_VIDEO_PROVIDER,
+        generation_version: 1,
         render_plan: renderPlan,
+        scene_plan: scenePlan,
+        cost_estimate: costEstimate,
         prompt,
         media_asset_ids: payload.media_asset_ids || [],
         cached_media: mediaCache.cacheMetadata,
         external_ai_start_url: externalAiStartUrl,
         visual_prompt: payload.visual_prompt,
+      },
+    });
+
+    await auditService.log({
+      actor_id: actorId,
+      action: "video.generate.requested",
+      entity_type: "job",
+      entity_id: job.id,
+      metadata: {
+        product_id: product.id,
+        asset_id: asset.id,
+        provider: env.AI_VIDEO_PROVIDER,
+        duration: payload.duration,
+        segments: costEstimate.segments,
+        estimated_cost_usd: costEstimate.estimated_cost_usd,
       },
     });
 
@@ -261,10 +327,13 @@ export const videosService = {
       await enqueueVideoGeneration({
         job_id: job.id,
         asset_id: asset.id,
+        requested_by_user_id: actorId,
         product_name: product.name,
         source_url: queueSourceUrl,
         media_urls: renderMediaUrls,
         render_plan: renderPlan,
+        scene_plan: scenePlan,
+        cost_estimate: costEstimate,
         script,
         ai_prompt: prompt,
         duration: payload.duration,
@@ -298,10 +367,15 @@ export const videosService = {
       media_asset_id: asset.id,
       payload: {
         asset_id: asset.id,
+        requested_by_user_id: actorId,
+        product_name: product.name,
+        ai_video_stage: "queued",
         ai_provider: aiResult.provider,
         ai_video_provider: env.AI_VIDEO_PROVIDER,
         prompt,
         render_plan: renderPlan,
+        scene_plan: scenePlan,
+        cost_estimate: costEstimate,
         cached_media: mediaCache.cacheMetadata,
         external_ai_start_url: externalAiStartUrl,
         media_asset_ids: payload.media_asset_ids || [],
@@ -309,6 +383,7 @@ export const videosService = {
       result: {
         asset_id: asset.id,
         queue: "video_generation",
+        cost_estimate: costEstimate,
       },
     });
 

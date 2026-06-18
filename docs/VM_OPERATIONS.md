@@ -152,6 +152,8 @@ WantedBy=timers.target
 ## Segurança operacional
 
 - Não commitar `.env`, `.env.local`, `.env.production` ou backups.
+- Usar `.env.vm.example` como base e manter `.env.local` apenas na VM.
+- Validar ambiente com `npm run env:check` antes de reiniciar serviços.
 - Trocar credenciais temporárias do setup antes de abrir a VM para fora da rede.
 - Manter `JWT_SECRET`, `ENCRYPTION_KEY`, tokens sociais e `OPENAI_API_KEY` apenas no ambiente da VM.
 - Antes de uso externo real, colocar API e mídia atrás de HTTPS.

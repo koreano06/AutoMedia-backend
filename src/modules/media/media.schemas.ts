@@ -19,6 +19,7 @@ export const mediaAssetPayloadSchema = z.object({
   duration: z.union([z.number(), z.string()]).optional(),
   review_notes: z.string().optional(),
   rejection_reason: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const mediaQuerySchema = z.object({

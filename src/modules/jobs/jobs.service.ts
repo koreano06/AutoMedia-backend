@@ -1,9 +1,10 @@
 import { jobsRepository } from "./jobs.repository.js";
 import { mediaRepository } from "../media/media.repository.js";
 import { productsRepository } from "../products/products.repository.js";
-import { enqueueVideoGeneration, type VideoRenderPlan } from "../videos/video-generation.queue.js";
+import { enqueueVideoGeneration, type VideoCostEstimate, type VideoRenderPlan } from "../videos/video-generation.queue.js";
 import { AppError } from "../../shared/errors/AppError.js";
 import type { Job, MediaAsset } from "../../shared/types/domain.js";
+import { auditService } from "../audit/audit.service.js";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -69,7 +70,7 @@ export const jobsService = {
     return jobsRepository.delete(id);
   },
 
-  async retry(id: string, workspaceId?: string) {
+  async retry(id: string, workspaceId?: string, actorId?: string) {
     const job = await jobsRepository.findById(id);
     if (!job) throw new AppError("Job não encontrado", 404, "JOB_NOT_FOUND");
     if (workspaceId && job.workspace_id && job.workspace_id !== workspaceId) throw new AppError("Job não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
@@ -99,19 +100,35 @@ export const jobsService = {
       payload: {
         ...(job.payload || {}),
         retry_requested_at: new Date().toISOString(),
+        retry_count: Number(job.payload?.retry_count || 0) + 1,
+        ai_video_stage: "queued",
       },
     });
 
     await enqueueVideoGeneration({
       job_id: job.id,
       asset_id: asset.id,
+      requested_by_user_id: actorId,
       product_name: product?.name || asset.product_name || readString(job.payload?.product_name),
       source_url: mediaUrls[0],
       media_urls: mediaUrls,
       render_plan: renderPlan,
+      scene_plan: readRenderPlan(job.payload?.scene_plan) || renderPlan,
+      cost_estimate: isObject(job.payload?.cost_estimate) ? job.payload.cost_estimate as VideoCostEstimate : undefined,
       script: asset.caption || readString(job.payload?.script),
       duration: asset.duration || readString(job.payload?.duration) || renderPlan?.duration,
       ratio: readString(job.payload?.ratio) || renderPlan?.ratio || "9:16",
+    });
+
+    await auditService.log({
+      actor_id: actorId,
+      action: "video.job.retry",
+      entity_type: "job",
+      entity_id: job.id,
+      metadata: {
+        asset_id: asset.id,
+        previous_error: job.error_message,
+      },
     });
 
     return queuedJob;

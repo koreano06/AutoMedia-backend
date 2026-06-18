@@ -22,6 +22,7 @@
     "start": "node dist/src/server.js",
     "worker:video": "tsx src/modules/videos/video-generation.worker.cli.ts",
     "prod:check": "node scripts/check-production-env.mjs",
+    "env:check": "node scripts/check-env-local.mjs",
     "infra:check": "node scripts/check-infrastructure.mjs",
     "monitor:health": "node scripts/health-monitor.mjs",
     "vm:deploy": "node scripts/vm-deploy.mjs",

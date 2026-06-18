@@ -55,6 +55,8 @@ const envSchema = z.object({
   REPLICATE_KLING_NEGATIVE_PROMPT: z.string().default("low quality, distorted product, unreadable text, extra fingers, deformed hands, watermark, logo distortion"),
   REPLICATE_POLL_INTERVAL_MS: z.coerce.number().default(5000),
   REPLICATE_TIMEOUT_MS: z.coerce.number().default(420000),
+  AI_VIDEO_SEGMENT_ESTIMATED_COST_USD: z.coerce.number().min(0).default(0),
+  AI_VIDEO_FFMPEG_ESTIMATED_COST_USD: z.coerce.number().min(0).default(0),
   STORAGE_DRIVER: z.enum(["local", "s3", "supabase"]).default("local"),
   UPLOADS_DIR: z.string().default("uploads"),
   S3_ENDPOINT: z.string().url().optional(),

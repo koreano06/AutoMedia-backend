@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   platformsService: {
     publish: vi.fn(),
   },
+  auditService: {
+    log: vi.fn(),
+  },
   postsRepository: {
     create: vi.fn(),
     delete: vi.fn(),
@@ -23,6 +26,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../database/prisma.js", () => ({ prisma: mocks.prisma }));
+vi.mock("../audit/audit.service.js", () => ({ auditService: mocks.auditService }));
 vi.mock("../media/media.repository.js", () => ({ mediaRepository: mocks.mediaRepository }));
 vi.mock("../platforms/platforms.service.js", () => ({ platformsService: mocks.platformsService }));
 vi.mock("./posts.repository.js", () => ({ postsRepository: mocks.postsRepository }));

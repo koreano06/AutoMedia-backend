@@ -5,6 +5,7 @@ import { nowIso } from "../../shared/utils/dates.js";
 import type { Post } from "../../shared/types/domain.js";
 import { platformsService } from "../platforms/platforms.service.js";
 import { prisma } from "../../database/prisma.js";
+import { auditService } from "../audit/audit.service.js";
 
 function randomScheduleDate() {
   const date = new Date();
@@ -18,30 +19,36 @@ export const postsService = {
     return postsRepository.list(order, limit);
   },
 
-  create(payload: Partial<Post>, workspaceId?: string) {
-    return postsRepository.create({ status: payload.status || "scheduled", workspace_id: workspaceId, ...payload });
+  async create(payload: Partial<Post>, workspaceId?: string, actorId?: string) {
+    const post = await postsRepository.create({ status: payload.status || "scheduled", workspace_id: workspaceId, ...payload });
+    await auditService.log({ actor_id: actorId, action: "post.create", entity_type: "post", entity_id: post.id, after: post });
+    return post;
   },
 
-  async update(id: string, payload: Partial<Post>, workspaceId?: string) {
+  async update(id: string, payload: Partial<Post>, workspaceId?: string, actorId?: string) {
     const post = await postsRepository.findById(id);
     if (!post) throw new AppError("Post não encontrado", 404, "POST_NOT_FOUND");
     if (workspaceId && post.workspace_id && post.workspace_id !== workspaceId) throw new AppError("Post não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
-    return postsRepository.update(id, payload);
+    const updated = await postsRepository.update(id, payload);
+    await auditService.log({ actor_id: actorId, action: "post.update", entity_type: "post", entity_id: id, before: post, after: updated });
+    return updated;
   },
 
-  async delete(id: string, workspaceId?: string) {
+  async delete(id: string, workspaceId?: string, actorId?: string) {
     const post = await postsRepository.findById(id);
     if (!post) throw new AppError("Post não encontrado", 404, "POST_NOT_FOUND");
     if (workspaceId && post.workspace_id && post.workspace_id !== workspaceId) throw new AppError("Post não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
-    return postsRepository.delete(id);
+    const deleted = await postsRepository.delete(id);
+    await auditService.log({ actor_id: actorId, action: "post.delete", entity_type: "post", entity_id: id, before: post });
+    return deleted;
   },
 
-  async schedule(payload: { media_asset_id: string; platforms: string[]; caption: string; schedule_mode: "now" | "scheduled" | "random_window"; scheduled_at?: string }, workspaceId?: string) {
+  async schedule(payload: { media_asset_id: string; platforms: string[]; caption: string; schedule_mode: "now" | "scheduled" | "random_window"; scheduled_at?: string }, workspaceId?: string, actorId?: string) {
     const asset = await mediaRepository.findById(payload.media_asset_id);
     if (!asset) throw new AppError("Mídia não encontrada para agendamento", 404, "MEDIA_NOT_FOUND");
     if (workspaceId && asset.workspace_id && asset.workspace_id !== workspaceId) throw new AppError("Mídia não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
 
-    return Promise.all(payload.platforms.map((platform) => postsRepository.create({
+    const posts = await Promise.all(payload.platforms.map((platform) => postsRepository.create({
       media_asset_id: asset.id,
       workspace_id: workspaceId || asset.workspace_id,
       product_id: asset.product_id,
@@ -57,9 +64,17 @@ export const postsService = {
       engagement_shares: 0,
       engagement_reach: 0,
     })));
+    await auditService.log({
+      actor_id: actorId,
+      action: "post.schedule",
+      entity_type: "media_asset",
+      entity_id: asset.id,
+      metadata: { post_ids: posts.map((post) => post.id), platforms: payload.platforms, schedule_mode: payload.schedule_mode },
+    });
+    return posts;
   },
 
-  async publishNow(id: string, workspaceId?: string) {
+  async publishNow(id: string, workspaceId?: string, actorId?: string) {
     const post = await postsRepository.findById(id);
     if (!post) throw new AppError("Post não encontrado", 404, "POST_NOT_FOUND");
     if (workspaceId && post.workspace_id && post.workspace_id !== workspaceId) throw new AppError("Post não pertence a este workspace", 403, "WORKSPACE_FORBIDDEN");
@@ -74,7 +89,7 @@ export const postsService = {
       media_url: post.thumbnail_url,
     }, workspaceId || post.workspace_id);
 
-    return postsRepository.update(id, {
+    const updated = await postsRepository.update(id, {
       status: result.status,
       published_at: result.status === "published" ? nowIso() : post.published_at,
       external_post_id: result.external_post_id,
@@ -83,6 +98,16 @@ export const postsService = {
       retry_count: (post.retry_count || 0) + 1,
       last_sync_at: nowIso(),
     });
+    await auditService.log({
+      actor_id: actorId,
+      action: "post.publish_now",
+      entity_type: "post",
+      entity_id: id,
+      before: post,
+      after: updated,
+      metadata: { platform: post.platform, status: result.status },
+    });
+    return updated;
   },
 
   async publishDue(payload: { limit?: number; dry_run?: boolean } = {}, workspaceId?: string) {

@@ -85,7 +85,7 @@ export function buildApp() {
       return mediaService.update(id, payload, request.user?.workspace_id);
     });
     api.post("/video-generate", async (request) => {
-      return videosService.generate(request.body as { product_id: string; media_asset_ids: string[]; style: string; duration: string; briefing?: string; platform?: string }, request.user?.workspace_id);
+      return videosService.generate(request.body as { product_id: string; media_asset_ids: string[]; style: string; duration: string; briefing?: string; platform?: string }, request.user?.workspace_id, request.user?.id);
     });
     api.post("/product-image-upload", async (request) => {
       const body = (request.body || {}) as {
@@ -165,7 +165,7 @@ export function buildApp() {
     api.post("/post-publish-now", async (request) => {
       assertAdmin(request);
       const { id } = request.body as { id: string };
-      return postsService.publishNow(id, request.user?.workspace_id);
+      return postsService.publishNow(id, request.user?.workspace_id, request.user?.id);
     });
     api.post("/post-publish-due", async (request) => {
       assertAdmin(request);
@@ -173,12 +173,12 @@ export function buildApp() {
     });
     api.post("/post-update", async (request) => {
       const { id, ...payload } = request.body as { id: string; [key: string]: unknown };
-      return postsService.update(id, payload, request.user?.workspace_id);
+      return postsService.update(id, payload, request.user?.workspace_id, request.user?.id);
     });
     api.post("/post-delete", async (request) => {
       assertAdmin(request);
       const { id } = request.body as { id: string };
-      return postsService.delete(id, request.user?.workspace_id);
+      return postsService.delete(id, request.user?.workspace_id, request.user?.id);
     });
     api.register(registerMetaRoutes, { prefix: "/meta" });
     api.register(registerAuthRoutes, { prefix: "/auth" });

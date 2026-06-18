@@ -262,16 +262,16 @@ Se o CLI pedir aceite de termos, abra o link mostrado, aceite no navegador e rod
 npm install
 ```
 
-2. Crie o `.env` a partir do exemplo:
+2. Crie o `.env.local` a partir do exemplo:
 
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
 No PowerShell, se preferir:
 
 ```powershell
-Copy-Item .env.example .env
+Copy-Item .env.example .env.local
 ```
 
 3. Configure pelo menos:
@@ -285,7 +285,13 @@ FRONTEND_URL="http://localhost:5173"
 API_PUBLIC_URL="http://localhost:3333"
 ```
 
-4. Prepare o banco:
+4. Valide o arquivo de ambiente:
+
+```bash
+npm run env:check
+```
+
+5. Prepare o banco:
 
 ```bash
 npm run db:generate
@@ -300,13 +306,13 @@ usuario: admin
 senha: admin123
 ```
 
-5. Inicie a API:
+6. Inicie a API:
 
 ```bash
 npm run dev
 ```
 
-6. Para renderização real de vídeos, rode o worker em outro terminal:
+7. Para renderização real de vídeos, rode o worker em outro terminal:
 
 ```bash
 npm run worker:video
@@ -323,6 +329,7 @@ npm run test         # testes com Vitest
 npm run crud:check   # smoke test CRUD contra API real
 npm run check:errors # roda validações e mostra apenas erros
 npm run worker:video # worker BullMQ de renderização de vídeo
+npm run env:check    # valida .env.local sem expor segredos
 npm run prod:check   # valida variáveis essenciais de produção
 npm run infra:check  # valida Redis e storage persistente
 npm run monitor:health # verifica API, Redis, storage e backup recente
@@ -376,6 +383,20 @@ npm run db:studio
 ```
 
 ## Variáveis Importantes
+
+O backend usa `.env.local` como arquivo operacional. Esse arquivo nunca deve ir para o Git. Para a VM/home lab, use `.env.vm.example` como base segura:
+
+```bash
+cp .env.vm.example .env.local
+nano .env.local
+npm run env:check
+```
+
+Guia completo de ambiente:
+
+```text
+docs/ENVIRONMENT.md
+```
 
 ### Aplicação
 
@@ -535,6 +556,17 @@ Quando a demanda aumentar, a migração mais simples é manter a mesma arquitetu
 
 ### VM/Home Lab
 
+Arquivo de ambiente da VM:
+
+```bash
+cd ~/automedia/backend
+cp .env.vm.example .env.local
+nano .env.local
+npm run env:check
+```
+
+Use o comando acima na primeira configuração ou sempre que trocar chaves, URLs, provider de IA, storage ou integrações sociais. O `.env.local` fica apenas na VM e não deve ser commitado.
+
 Serviços esperados na VM:
 
 ```bash
@@ -547,6 +579,14 @@ Deploy operacional:
 
 ```bash
 ~/automedia/deploy-backend.sh
+```
+
+Antes de reiniciar manualmente os serviços, valide:
+
+```bash
+cd ~/automedia/backend
+npm run env:check
+npm run infra:check
 ```
 
 Healthcheck:
