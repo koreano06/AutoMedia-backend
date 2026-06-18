@@ -59,6 +59,7 @@ const envSchema = z.object({
   AI_VIDEO_FFMPEG_ESTIMATED_COST_USD: z.coerce.number().min(0).default(0),
   STORAGE_DRIVER: z.enum(["local", "s3", "supabase"]).default("local"),
   UPLOADS_DIR: z.string().default("uploads"),
+  UPLOAD_BODY_LIMIT_MB: z.coerce.number().positive().default(20),
   S3_ENDPOINT: z.string().url().optional(),
   S3_PUBLIC_URL: z.string().url().optional(),
   S3_REGION: z.string().default("us-east-1"),

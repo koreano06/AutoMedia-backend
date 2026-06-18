@@ -45,7 +45,10 @@ function assertAdmin(request: { user?: { role: string } }) {
 }
 
 export function buildApp() {
-  const app = Fastify({ logger: env.NODE_ENV !== "test" });
+  const app = Fastify({
+    logger: env.NODE_ENV !== "test",
+    bodyLimit: env.UPLOAD_BODY_LIMIT_MB * 1024 * 1024,
+  });
 
   app.register(helmet, {
     contentSecurityPolicy: false,
