@@ -13,6 +13,14 @@ type RenderVideoInput = {
   ratio?: string;
 };
 
+type ConcatAIVideoSegmentsInput = {
+  jobId: string;
+  assetId: string;
+  urls: string[];
+  ratio?: string;
+  durationSeconds?: number;
+};
+
 export const videoRendererService = {
   async render(input: RenderVideoInput) {
     if (env.VIDEO_RENDER_DRIVER === "mock") {
@@ -34,6 +42,15 @@ export const videoRendererService = {
       duration: input.duration,
       ratio: input.ratio,
       outputName: `${input.jobId}-${input.assetId}`,
+    });
+  },
+
+  async concatAIVideoSegments(input: ConcatAIVideoSegmentsInput) {
+    return ffmpegProvider.concatRemoteVideos({
+      urls: input.urls,
+      ratio: input.ratio,
+      durationSeconds: input.durationSeconds,
+      outputName: `${input.jobId}-${input.assetId}-ai-final`,
     });
   },
 };

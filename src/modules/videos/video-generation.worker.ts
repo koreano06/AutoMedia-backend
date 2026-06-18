@@ -8,6 +8,101 @@ import { storageService } from "../../integrations/storage/storage.service.js";
 import { videoRendererService } from "../../integrations/video-rendering/video-renderer.service.js";
 import { VIDEO_GENERATION_QUEUE, type VideoGenerationQueuePayload } from "./video-generation.queue.js";
 import { AppError } from "../../shared/errors/AppError.js";
+import type { AIVideoResult } from "../../integrations/ai-video/ai-video.types.js";
+import type { VideoRenderPlan, VideoRenderScene } from "./video-generation.queue.js";
+
+function secondsFromDuration(duration?: string | number) {
+  if (typeof duration === "number") return Math.max(5, duration);
+  const match = String(duration || "10s").match(/\d+/);
+  return Math.max(5, Number(match?.[0] || 10));
+}
+
+function splitDurationIntoSegments(totalSeconds: number) {
+  const segments: number[] = [];
+  let remaining = totalSeconds;
+
+  while (remaining > 0) {
+    const next = Math.min(10, remaining);
+    segments.push(next);
+    remaining -= next;
+  }
+
+  return segments;
+}
+
+function compactText(value?: string) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function sceneSummary(scene: VideoRenderScene) {
+  return [
+    `${scene.order}. ${scene.type}`,
+    scene.headline,
+    scene.subheadline,
+    scene.instruction,
+  ].filter(Boolean).join(" - ");
+}
+
+function scenesForSegment(renderPlan: VideoRenderPlan | undefined, segmentIndex: number, totalSegments: number) {
+  const scenes = renderPlan?.scenes || [];
+  if (!scenes.length) return [];
+
+  const segmentSize = Math.ceil(scenes.length / totalSegments);
+  const start = segmentIndex * segmentSize;
+  const selected = scenes.slice(start, start + segmentSize);
+
+  return selected.length ? selected : scenes.slice(-1);
+}
+
+function buildSegmentPrompt(input: {
+  renderPlan?: VideoRenderPlan;
+  basePrompt?: string;
+  segmentIndex: number;
+  totalSegments: number;
+  segmentSeconds: number;
+}) {
+  const segmentNumber = input.segmentIndex + 1;
+  const selectedScenes = scenesForSegment(input.renderPlan, input.segmentIndex, input.totalSegments);
+  const sceneText = selectedScenes.map(sceneSummary).join(" | ");
+  const basePrompt = compactText(input.basePrompt || input.renderPlan?.script);
+  const continuityInstruction = input.totalSegments > 1
+    ? `This is segment ${segmentNumber} of ${input.totalSegments} of the same final video. Keep the same product, environment, lighting, hands, camera style and visual identity.`
+    : "This is the full video.";
+  const openingInstruction = segmentNumber === 1
+    ? "Start with the hook and product reveal. Do not show the final CTA yet unless this is the only segment."
+    : "Continue naturally from the previous segment. Do not repeat the opening unboxing unless it is needed for continuity.";
+  const closingInstruction = segmentNumber === input.totalSegments
+    ? "End this segment with the final CTA and a clear product beauty shot."
+    : "End this segment with a visual bridge that can cut smoothly into the next segment. Do not use final CTA.";
+
+  return [
+    continuityInstruction,
+    `Generate only ${input.segmentSeconds} seconds for this segment.`,
+    openingInstruction,
+    closingInstruction,
+    selectedScenes.length ? `Scenes to cover in this segment: ${sceneText}.` : "",
+    "The final platform will concatenate all segments, so each segment must look like part of one continuous product ad.",
+    basePrompt,
+  ].filter(Boolean).join("\n\n");
+}
+
+function segmentRenderPlan(renderPlan: VideoRenderPlan | undefined, segmentIndex: number, totalSegments: number, segmentSeconds: number): VideoRenderPlan | undefined {
+  if (!renderPlan) return undefined;
+
+  const selectedScenes = scenesForSegment(renderPlan, segmentIndex, totalSegments);
+  return {
+    ...renderPlan,
+    duration: `${segmentSeconds}s`,
+    scenes: selectedScenes.length ? selectedScenes : renderPlan.scenes,
+    script: buildSegmentPrompt({
+      renderPlan,
+      basePrompt: renderPlan.script,
+      segmentIndex,
+      totalSegments,
+      segmentSeconds,
+    }),
+  };
+}
 
 export function startVideoGenerationWorker() {
   const worker = new Worker<VideoGenerationQueuePayload>(
@@ -40,27 +135,75 @@ export function startVideoGenerationWorker() {
             },
           });
 
-          const aiVideo = await aiVideoService.generate({
-            assetId: payload.asset_id,
-            jobId: payload.job_id,
-            productName: payload.product_name,
-            startImageUrl: payload.source_url || payload.media_urls?.[0] || asset?.thumbnail_url || asset?.url,
-            prompt: payload.ai_prompt || payload.script || payload.render_plan?.script || "",
-            duration: payload.duration,
-            ratio: payload.ratio,
-            renderPlan: payload.render_plan,
-          });
+          const requestedSeconds = secondsFromDuration(payload.duration);
+          const segmentDurations = requestedSeconds > 10 ? splitDurationIntoSegments(requestedSeconds) : [requestedSeconds];
+          const aiVideos: AIVideoResult[] = [];
+
+          for (const [index, segmentSeconds] of segmentDurations.entries()) {
+            const segmentProgress = 45 + Math.round((index / segmentDurations.length) * 30);
+            await jobsRepository.update(payload.job_id, {
+              status: "rendering",
+              progress: segmentProgress,
+              payload: {
+                ...payload,
+                ai_video_stage: "external_generation",
+                ai_video_segments_total: segmentDurations.length,
+                ai_video_segment_current: index + 1,
+              },
+            });
+
+            const aiVideo = await aiVideoService.generate({
+              assetId: payload.asset_id,
+              jobId: payload.job_id,
+              productName: payload.product_name,
+              startImageUrl: payload.source_url || payload.media_urls?.[0] || asset?.thumbnail_url || asset?.url,
+              prompt: buildSegmentPrompt({
+                renderPlan: payload.render_plan,
+                basePrompt: payload.ai_prompt || payload.script || payload.render_plan?.script,
+                segmentIndex: index,
+                totalSegments: segmentDurations.length,
+                segmentSeconds,
+              }),
+              duration: `${segmentSeconds}s`,
+              ratio: payload.ratio,
+              renderPlan: segmentRenderPlan(payload.render_plan, index, segmentDurations.length, segmentSeconds),
+            });
+
+            aiVideos.push(aiVideo);
+          }
 
           await jobsRepository.update(payload.job_id, {
             status: "uploading",
-            progress: 86,
+            progress: segmentDurations.length > 1 ? 82 : 86,
           });
 
-          const upload = await storageService.cacheRemoteMedia({
-            url: aiVideo.output_url,
-            keyPrefix: `rendered-videos/${payload.asset_id}`,
-            fallbackName: `${payload.asset_id}.mp4`,
-          });
+          const totalDuration = aiVideos.reduce((total, video) => total + (video.duration_seconds || 0), 0) || requestedSeconds;
+          const upload = aiVideos.length > 1
+            ? await (async () => {
+              const rendered = await videoRendererService.concatAIVideoSegments({
+                jobId: payload.job_id,
+                assetId: payload.asset_id,
+                urls: aiVideos.map((video) => video.output_url),
+                ratio: payload.ratio,
+                durationSeconds: totalDuration,
+              });
+              const stored = await storageService.uploadVideo({
+                localPath: rendered.localPath,
+                key: `rendered-videos/${payload.asset_id}.mp4`,
+                contentType: rendered.mime_type,
+              });
+              await unlink(rendered.localPath).catch(() => undefined);
+              return {
+                ...stored,
+                content_type: rendered.mime_type,
+                size: undefined,
+              };
+            })()
+            : await storageService.cacheRemoteMedia({
+              url: aiVideos[0].output_url,
+              keyPrefix: `rendered-videos/${payload.asset_id}`,
+              fallbackName: `${payload.asset_id}.mp4`,
+            });
 
           const updatedAsset = await mediaRepository.update(payload.asset_id, {
             status: "pending_review",
@@ -69,16 +212,25 @@ export function startVideoGenerationWorker() {
             storage_key: upload.storage_key,
             mime_type: upload.content_type || "video/mp4",
             file_size: upload.size,
-            duration: String(aiVideo.duration_seconds || payload.duration || ""),
+            duration: String(totalDuration || payload.duration || ""),
             quality_score: 90,
             metadata: {
               ...(asset.metadata && typeof asset.metadata === "object" ? asset.metadata : {}),
               ai_video: {
-                provider: aiVideo.provider,
-                model: aiVideo.model,
-                prediction_id: aiVideo.prediction_id,
-                remote_output_url: aiVideo.output_url,
-                metadata: aiVideo.metadata || {},
+                provider: aiVideos[0].provider,
+                model: aiVideos[0].model,
+                prediction_id: aiVideos.map((video) => video.prediction_id).filter(Boolean).join(","),
+                remote_output_url: aiVideos.length === 1 ? aiVideos[0].output_url : undefined,
+                segments: aiVideos.map((video, index) => ({
+                  index: index + 1,
+                  duration_seconds: video.duration_seconds,
+                  prediction_id: video.prediction_id,
+                  output_url: video.output_url,
+                  metadata: video.metadata || {},
+                })),
+                requested_duration_seconds: requestedSeconds,
+                final_duration_seconds: totalDuration,
+                concatenated_with_ffmpeg: aiVideos.length > 1,
               },
             },
           });
@@ -93,13 +245,15 @@ export function startVideoGenerationWorker() {
               asset_id: payload.asset_id,
               storage_provider: upload.provider,
               url: upload.url,
-              ai_video_provider: aiVideo.provider,
-              ai_video_model: aiVideo.model,
-              prediction_id: aiVideo.prediction_id,
+              ai_video_provider: aiVideos[0].provider,
+              ai_video_model: aiVideos[0].model,
+              prediction_id: aiVideos.map((video) => video.prediction_id).filter(Boolean).join(","),
+              ai_video_segments: aiVideos.length,
+              final_duration_seconds: totalDuration,
             },
           });
 
-          return { asset_id: updatedAsset.id, url: upload.url, ai_video_provider: aiVideo.provider };
+          return { asset_id: updatedAsset.id, url: upload.url, ai_video_provider: aiVideos[0].provider, segments: aiVideos.length };
         } catch (error) {
           if (!aiVideoService.shouldFallbackToFfmpeg(error)) throw error;
 

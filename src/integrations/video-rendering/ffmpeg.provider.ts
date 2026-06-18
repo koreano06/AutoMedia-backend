@@ -16,6 +16,13 @@ type RenderInput = {
   ratio?: string;
 };
 
+type ConcatRemoteVideosInput = {
+  urls: string[];
+  outputName: string;
+  ratio?: string;
+  durationSeconds?: number;
+};
+
 function secondsFromDuration(duration?: string | number) {
   if (typeof duration === "number") return Math.max(3, duration);
   const match = String(duration || "30s").match(/\d+/);
@@ -79,6 +86,31 @@ function escapeDrawText(value: string) {
 
 function concatFilePath(filePath: string) {
   return filePath.replace(/\\/g, "/").replace(/'/g, "'\\''");
+}
+
+async function normalizeVideoSegment(input: {
+  sourcePath: string;
+  outputPath: string;
+  width: number;
+  height: number;
+}) {
+  await runFfmpeg([
+    "-y",
+    "-i",
+    input.sourcePath,
+    "-vf",
+    `scale=${input.width}:${input.height}:force_original_aspect_ratio=increase,crop=${input.width}:${input.height},setsar=1,format=yuv420p`,
+    "-r",
+    "30",
+    "-an",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-movflags",
+    "+faststart",
+    input.outputPath,
+  ]);
 }
 
 function normalizeSceneSource(scene: VideoRenderScene, fallbackSource: string) {
@@ -168,6 +200,29 @@ async function materializeRemoteUrl(sourceUrl: string, outputName: string) {
 
   const extension = extensionFromContentType(contentType, sourceUrl);
   const inputPath = path.join(tmpdir(), `${outputName}-remote.${extension}`);
+  await writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
+  return inputPath;
+}
+
+async function materializeRemoteVideo(sourceUrl: string, outputName: string) {
+  const response = await fetch(sourceUrl, {
+    headers: {
+      "User-Agent": "AutoMedia/1.0 (+https://auto-media-sooty.vercel.app)",
+      Accept: "video/mp4,video/*,*/*;q=0.8",
+    },
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    throw new AppError(`Nao foi possivel baixar o segmento de video IA (${response.status})`, 422, "AI_VIDEO_SEGMENT_DOWNLOAD_FAILED");
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.startsWith("video/") && !contentType.includes("octet-stream")) {
+    throw new AppError(`Segmento de video IA nao parece ser video (${contentType || "sem content-type"})`, 422, "AI_VIDEO_SEGMENT_INVALID_TYPE");
+  }
+
+  const inputPath = path.join(tmpdir(), `${outputName}.mp4`);
   await writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
   return inputPath;
 }
@@ -440,6 +495,58 @@ export const ffmpegProvider = {
       localPath: outputPath,
       mime_type: "video/mp4",
       duration: scenes.reduce((total, scene) => total + scene.duration_seconds, 0),
+      width,
+      height,
+    };
+  },
+
+  async concatRemoteVideos(input: ConcatRemoteVideosInput) {
+    if (input.urls.length < 2) {
+      throw new AppError("A montagem de video longo precisa de pelo menos dois segmentos.", 422, "AI_VIDEO_SEGMENTS_TOO_FEW");
+    }
+
+    const { width, height } = sizeForRatio(input.ratio);
+    const safeName = input.outputName.replace(/[^a-z0-9-_]/gi, "-").toLowerCase();
+    const outputDir = path.join(tmpdir(), "automedia-renders");
+    const outputPath = path.join(outputDir, `${safeName}.mp4`);
+    const normalizedPaths: string[] = [];
+
+    await mkdir(outputDir, { recursive: true });
+
+    for (const [index, url] of input.urls.entries()) {
+      const rawPath = await materializeRemoteVideo(url, `${safeName}-ai-segment-${index + 1}-raw`);
+      const normalizedPath = path.join(outputDir, `${safeName}-ai-segment-${index + 1}.mp4`);
+      normalizedPaths.push(normalizedPath);
+      await normalizeVideoSegment({
+        sourcePath: rawPath,
+        outputPath: normalizedPath,
+        width,
+        height,
+      });
+    }
+
+    const concatPath = path.join(outputDir, `${safeName}-ai-concat.txt`);
+    await writeFile(concatPath, normalizedPaths.map((segmentPath) => `file '${concatFilePath(segmentPath)}'`).join("\n"));
+
+    await runFfmpeg([
+      "-y",
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-i",
+      concatPath,
+      "-c:v",
+      "copy",
+      "-movflags",
+      "+faststart",
+      outputPath,
+    ]);
+
+    return {
+      localPath: outputPath,
+      mime_type: "video/mp4",
+      duration: input.durationSeconds || input.urls.length * 10,
       width,
       height,
     };
