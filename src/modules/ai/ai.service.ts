@@ -24,6 +24,15 @@ type OpenAITextResponse = {
   };
 };
 
+type GenerateTextOptions = {
+  instructions?: string;
+  jsonSchema?: {
+    name: string;
+    schema: Record<string, unknown>;
+    strict?: boolean;
+  };
+};
+
 function buildLocalSuggestion(prompt: string) {
   const normalized = prompt.toLowerCase();
 
@@ -131,11 +140,33 @@ function extractOpenAIText(payload: OpenAITextResponse) {
   );
 }
 
-async function generateTextWithOpenAI(prompt: string) {
+async function generateTextWithOpenAI(prompt: string, options: GenerateTextOptions = {}) {
   if (!env.OPENAI_API_KEY) {
     return {
       text: buildLocalSuggestion(prompt),
       provider: "local-template",
+    };
+  }
+
+  const requestBody: Record<string, unknown> = {
+    model: env.OPENAI_TEXT_MODEL,
+    instructions: options.instructions || [
+      "Voce e um estrategista de criativos para social commerce.",
+      "Escreva roteiros curtos, claros e prontos para videos verticais.",
+      "Evite promessas exageradas, linguagem enganosa e tom de spam.",
+      "Retorne em portugues do Brasil.",
+    ].join(" "),
+    input: prompt,
+  };
+
+  if (options.jsonSchema) {
+    requestBody.text = {
+      format: {
+        type: "json_schema",
+        name: options.jsonSchema.name,
+        strict: options.jsonSchema.strict ?? true,
+        schema: options.jsonSchema.schema,
+      },
     };
   }
 
@@ -145,16 +176,7 @@ async function generateTextWithOpenAI(prompt: string) {
       Authorization: `Bearer ${env.OPENAI_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: env.OPENAI_TEXT_MODEL,
-      instructions: [
-        "Voce e um estrategista de criativos para social commerce.",
-        "Escreva roteiros curtos, claros e prontos para videos verticais.",
-        "Evite promessas exageradas, linguagem enganosa e tom de spam.",
-        "Retorne em portugues do Brasil.",
-      ].join(" "),
-      input: prompt,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   const payload = (await response.json()) as OpenAITextResponse;
@@ -176,8 +198,8 @@ async function generateTextWithOpenAI(prompt: string) {
 }
 
 export const aiService = {
-  async generateText(prompt: string) {
-    return generateTextWithOpenAI(prompt);
+  async generateText(prompt: string, options?: GenerateTextOptions) {
+    return generateTextWithOpenAI(prompt, options);
   },
 
   async generateImage(input: GenerateImageInput) {

@@ -436,7 +436,7 @@ BACKUPS_DIR="backups"
 BACKUP_RETENTION_DAYS="14"
 MINIO_DATA_DIR="../data/minio"
 S3_ENDPOINT="http://localhost:9000"
-S3_PUBLIC_URL="http://192.168.1.6:9000"
+S3_PUBLIC_URL="http://192.168.1.42:9000"
 S3_REGION="us-east-1"
 S3_BUCKET="automedia-media"
 S3_ACCESS_KEY_ID=""
@@ -550,7 +550,7 @@ Produção atual escolhida para economizar e manter controle:
 - Storage: MinIO/S3 em Docker na VM.
 - Frontend: Vercel apontando para uma URL pública HTTPS do backend.
 
-Próximo ajuste obrigatório para uso fora da rede local: publicar a API e o MinIO por domínio/tunnel HTTPS. O frontend da Vercel não deve apontar para `192.168.1.6`.
+Próximo ajuste obrigatório para uso fora da rede local: publicar a API e o MinIO por domínio/tunnel HTTPS. O frontend da Vercel não deve apontar para `192.168.1.42`.
 
 Quando a demanda aumentar, a migração mais simples é manter a mesma arquitetura e trocar cada peça por serviço gerenciado: PostgreSQL gerenciado, Redis gerenciado e S3/Supabase Storage.
 

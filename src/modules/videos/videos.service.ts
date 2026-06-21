@@ -9,38 +9,159 @@ import type { GenerateVideoInput } from "./videos.schemas.js";
 import { enqueueVideoGeneration, type VideoCostEstimate, type VideoRenderPlan, type VideoRenderScene } from "./video-generation.queue.js";
 import { auditService } from "../audit/audit.service.js";
 
+type AIVideoSceneType = VideoRenderScene["type"];
+
+type AIVideoCreativeScene = {
+  order: number;
+  type: AIVideoSceneType;
+  duration_seconds: number;
+  headline: string;
+  subheadline: string;
+  instruction: string;
+  camera_direction: string;
+  on_screen_text: string;
+  voiceover: string;
+  reference_asset_hint: string;
+};
+
+type AIVideoCreativePlan = {
+  hook: string;
+  promise: string;
+  target_audience: string;
+  tone: string;
+  cta: string;
+  caption: string;
+  script: string;
+  safety_notes: string[];
+  scenes: AIVideoCreativeScene[];
+};
+
+type SceneTextDraft = Pick<VideoRenderScene, "type" | "headline" | "subheadline" | "instruction"> & {
+  duration_seconds?: number;
+};
+
+const VIDEO_CREATIVE_PLAN_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["hook", "promise", "target_audience", "tone", "cta", "caption", "script", "safety_notes", "scenes"],
+  properties: {
+    hook: { type: "string" },
+    promise: { type: "string" },
+    target_audience: { type: "string" },
+    tone: { type: "string" },
+    cta: { type: "string" },
+    caption: { type: "string" },
+    script: { type: "string" },
+    safety_notes: {
+      type: "array",
+      items: { type: "string" },
+    },
+    scenes: {
+      type: "array",
+      minItems: 4,
+      maxItems: 6,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "order",
+          "type",
+          "duration_seconds",
+          "headline",
+          "subheadline",
+          "instruction",
+          "camera_direction",
+          "on_screen_text",
+          "voiceover",
+          "reference_asset_hint",
+        ],
+        properties: {
+          order: { type: "integer" },
+          type: { type: "string", enum: ["hook", "benefit", "proof", "detail", "cta"] },
+          duration_seconds: { type: "integer", minimum: 3, maximum: 10 },
+          headline: { type: "string" },
+          subheadline: { type: "string" },
+          instruction: { type: "string" },
+          camera_direction: { type: "string" },
+          on_screen_text: { type: "string" },
+          voiceover: { type: "string" },
+          reference_asset_hint: { type: "string" },
+        },
+      },
+    },
+  },
+};
+
+function buildVideoCreativeInstructions() {
+  return [
+    "Voce e diretor criativo, roteirista de performance e estrategista de social commerce.",
+    "Sua tarefa e transformar um anuncio base em um plano de video curto, realista e publicavel para redes sociais.",
+    "Responda somente JSON valido obedecendo exatamente ao schema solicitado.",
+    "Use apenas informacoes fornecidas no briefing. Nao invente preco, desconto, frete, garantia, estoque, marca, especificacoes tecnicas ou resultados nao informados.",
+    "Nao cite marketplace, rede social, influenciador, cupom ou prazo se isso nao estiver no briefing.",
+    "Cada cena precisa ser filmavel ou geravel por IA: unboxing, close do produto, demonstracao, controle/acessorio, resultado visual e CTA.",
+    "Escreva headlines curtas para tela, com ate 8 palavras. Subheadline ate 14 palavras.",
+    "A instrucao de cada cena deve ser objetiva, visual e sem ambiguidades para um gerador de video.",
+    "Evite exageros, spam, promessas absolutas, comparacoes nao comprovadas e claims sensiveis.",
+    "O CTA deve ser natural e alinhado ao briefing, preferindo comentario, clique ou pedir link.",
+    "Português do Brasil, tom comercial natural, claro e profissional.",
+  ].join(" ");
+}
+
 function buildVideoPrompt(input: GenerateVideoInput, productName: string, productDescription?: string, mediaTitles: string[] = []) {
   const briefing = input.briefing_fields || {};
   const template = input.template || input.style || "product";
   const platforms = input.platforms?.length ? input.platforms.join(", ") : input.platform || "instagram";
+  const durationSeconds = secondsFromDuration(input.duration);
+  const sceneCount = Math.min(6, Math.max(4, Math.ceil(durationSeconds / 5)));
+  const templateGuide: Record<string, string> = {
+    unboxing: "Abrir com caixa/embalagem, revelar o produto, mostrar acessorios, demonstrar uso e fechar com CTA.",
+    demonstracao: "Apresentar problema/contexto, mostrar recurso principal, demonstrar uso real, exibir resultado e fechar com CTA.",
+    "antes-depois": "Mostrar situacao antes, introduzir produto, demonstrar transformacao visual e encerrar com resultado/CTA.",
+    oferta: "Gancho de oportunidade, beneficio principal, prova visual, urgencia moderada e CTA sem linguagem agressiva.",
+    review: "Vendedor apresenta o produto, mostra detalhes, explica beneficio, demonstra uso e recomenda proximo passo.",
+    marketplace: "Comecar pelo uso pratico, reforcar clareza visual, destacar beneficio e orientar o usuario a pedir o link.",
+    product: "Mostrar produto em contexto real, explicar beneficio, demonstrar uso e finalizar com CTA.",
+  };
 
   return [
-    "Crie um pacote profissional para gerar um vídeo de divulgação a partir de um anúncio base.",
-    `Anúncio/oferta base: ${productName}`,
-    `Descrição do anúncio: ${productDescription || "Sem descrição cadastrada"}`,
-    `Template/estilo: ${template}`,
-    `Formato: ${input.format || "reels"} ${input.ratio || "9:16"}`,
-    `Duração: ${input.duration}`,
-    `Ritmo: ${input.rhythm || "Cortes dinâmicos"}`,
-    `Áudio: ${input.audio || "Música tendência"}`,
-    `Plataformas: ${platforms}`,
-    `Público-alvo: ${briefing.targetAudience || "compradores interessados"}`,
-    `Tom de voz: ${briefing.tone || "Direto, natural e persuasivo"}`,
-    `Objetivo: ${briefing.objective || "Divulgação"}`,
-    `Promessa principal: ${briefing.promise || "benefício claro da oferta"}`,
-    `CTA: ${briefing.cta || "Comente eu quero para receber o link"}`,
-    `Restrições: ${briefing.restrictions || "evitar promessas exageradas e linguagem de spam"}`,
-    `Mídias selecionadas: ${mediaTitles.length ? mediaTitles.join(", ") : "usar imagem principal do anúncio"}`,
-    `Direção visual adicional: ${input.visual_prompt || "visual limpo, foco no produto, texto legível"}`,
-    `Briefing livre: ${input.briefing || briefing.extra || "sem briefing extra"}`,
+    "BRIEFING OPERACIONAL PARA PLANO DE VIDEO COM IA",
     "",
-    "Retorne em português com:",
-    "1. Gancho inicial",
-    "2. Cenas sugeridas com ordem",
-    "3. Texto na tela por cena",
-    "4. Legenda para publicação",
-    "5. CTA final",
-    "6. Observações de naturalidade/anti-spam",
+    "Objetivo:",
+    "Criar um plano estruturado para um video vertical de divulgacao, pronto para gerar cenas por IA e renderizar no AutoMedia.",
+    "",
+    "Dados do anuncio:",
+    `- Produto/anuncio: ${productName}`,
+    `- Descricao cadastrada: ${productDescription || "Nao informada"}`,
+    `- Template escolhido: ${template}`,
+    `- Regra do template: ${templateGuide[String(template).toLowerCase()] || templateGuide.product}`,
+    `- Formato: ${input.format || "reels"}`,
+    `- Proporcao: ${input.ratio || "9:16"}`,
+    `- Duracao desejada: ${durationSeconds}s`,
+    `- Quantidade esperada de cenas: ${sceneCount}`,
+    `- Ritmo: ${input.rhythm || "Cortes dinamicos, leitura facil e transicoes limpas"}`,
+    `- Audio: ${input.audio || "Trilha moderna sem narracao obrigatoria"}`,
+    `- Plataformas: ${platforms}`,
+    "",
+    "Briefing comercial:",
+    `- Publico-alvo: ${briefing.targetAudience || "pessoas interessadas no produto"}`,
+    `- Tom de voz: ${briefing.tone || "natural, vendedor consultivo, direto e confiavel"}`,
+    `- Objetivo: ${briefing.objective || "gerar interesse e pedido de link"}`,
+    `- Promessa principal permitida: ${briefing.promise || firstSentence(productDescription) || "mostrar o beneficio principal do produto"}`,
+    `- CTA permitido: ${briefing.cta || "Comente EU QUERO para receber o link"}`,
+    `- Restricoes: ${briefing.restrictions || "nao inventar informacoes, nao exagerar beneficios, nao usar tom apelativo"}`,
+    "",
+    "Materiais visuais disponiveis:",
+    `- Midias selecionadas: ${mediaTitles.length ? mediaTitles.join(" | ") : "imagem principal do anuncio ou imagem enviada pelo usuario"}`,
+    `- Direcao visual adicional: ${input.visual_prompt || "produto em destaque, ambiente realista, texto legivel e composicao limpa"}`,
+    `- Observacoes livres do usuario: ${input.briefing || briefing.extra || "sem observacoes extras"}`,
+    "",
+    "Regras obrigatorias de saida:",
+    "- Responder somente no JSON do schema.",
+    "- Criar cenas na ordem logica: gancho, demonstracao/beneficio, prova/detalhe, CTA.",
+    "- Cada cena precisa conter instrucao visual fechada, camera_direction, texto na tela e narracao curta.",
+    "- Se alguma informacao nao existir, use uma formulacao neutra. Nao invente dado tecnico.",
+    "- Nao incluir explicacoes fora do JSON.",
   ].join("\n");
 }
 
@@ -72,7 +193,83 @@ function sceneDurations(totalSeconds: number) {
   return [base, base + Math.max(0, remainder), base, base];
 }
 
-function buildSceneTexts(input: GenerateVideoInput, productName: string, productDescription?: string) {
+function normalizeSceneType(value?: string): AIVideoSceneType {
+  if (value === "hook" || value === "benefit" || value === "proof" || value === "detail" || value === "cta") return value;
+  return "detail";
+}
+
+function extractJsonText(value?: string) {
+  const text = compactText(value);
+  if (!text) return "";
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
+  if (fenced) return fenced.trim();
+  const first = text.indexOf("{");
+  const last = text.lastIndexOf("}");
+  if (first >= 0 && last > first) return text.slice(first, last + 1);
+  return text;
+}
+
+function parseCreativePlan(value?: string): AIVideoCreativePlan | undefined {
+  try {
+    const parsed = JSON.parse(extractJsonText(value)) as Partial<AIVideoCreativePlan>;
+    if (!Array.isArray(parsed.scenes) || !parsed.scenes.length) return undefined;
+
+    return {
+      hook: compactText(parsed.hook, "Gancho do produto"),
+      promise: compactText(parsed.promise, "Beneficio principal"),
+      target_audience: compactText(parsed.target_audience, "Publico interessado"),
+      tone: compactText(parsed.tone, "Natural e direto"),
+      cta: compactText(parsed.cta, "Comente EU QUERO"),
+      caption: compactText(parsed.caption, ""),
+      script: compactText(parsed.script, ""),
+      safety_notes: Array.isArray(parsed.safety_notes) ? parsed.safety_notes.map((note) => compactText(note)).filter(Boolean) : [],
+      scenes: parsed.scenes.slice(0, 6).map((scene, index) => ({
+        order: Number(scene.order || index + 1),
+        type: normalizeSceneType(scene.type),
+        duration_seconds: Math.min(10, Math.max(3, Number(scene.duration_seconds || 5))),
+        headline: limitText(scene.headline || `Cena ${index + 1}`, 48),
+        subheadline: limitText(scene.subheadline || "", 76),
+        instruction: compactText(scene.instruction, "Mostrar o produto com clareza."),
+        camera_direction: compactText(scene.camera_direction, "Camera vertical, movimento suave e foco no produto."),
+        on_screen_text: limitText(scene.on_screen_text || scene.headline || "", 72),
+        voiceover: compactText(scene.voiceover, ""),
+        reference_asset_hint: compactText(scene.reference_asset_hint, "Usar a imagem mais proxima do produto."),
+      })),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function buildScriptFromCreativePlan(plan?: AIVideoCreativePlan) {
+  if (!plan) return "";
+
+  return [
+    plan.hook ? `Gancho: ${plan.hook}` : "",
+    plan.promise ? `Promessa: ${plan.promise}` : "",
+    ...plan.scenes.map((scene) => `Cena ${scene.order}: ${scene.voiceover || scene.on_screen_text || scene.headline}`),
+    plan.cta ? `CTA: ${plan.cta}` : "",
+    plan.caption ? `Legenda: ${plan.caption}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+function buildSceneTexts(input: GenerateVideoInput, productName: string, productDescription?: string, creativePlan?: AIVideoCreativePlan) {
+  if (creativePlan?.scenes?.length) {
+    return creativePlan.scenes.map((scene) => ({
+      type: scene.type,
+      headline: limitText(scene.headline, 48),
+      subheadline: limitText(scene.subheadline || scene.on_screen_text, 76),
+      instruction: [
+        scene.instruction,
+        scene.camera_direction ? `Camera: ${scene.camera_direction}` : "",
+        scene.on_screen_text ? `Texto na tela: ${scene.on_screen_text}` : "",
+        scene.voiceover ? `Narracao: ${scene.voiceover}` : "",
+        scene.reference_asset_hint ? `Referencia visual: ${scene.reference_asset_hint}` : "",
+      ].filter(Boolean).join(" "),
+      duration_seconds: scene.duration_seconds,
+    })) as SceneTextDraft[];
+  }
+
   const briefing = input.briefing_fields || {};
   const benefit = briefing.promise || firstSentence(productDescription) || "Mais praticidade no dia a dia";
   const target = briefing.targetAudience || "sua rotina";
@@ -103,13 +300,20 @@ function buildSceneTexts(input: GenerateVideoInput, productName: string, product
       subheadline: limitText("Receba o link e veja os detalhes", 64),
       instruction: "Fechar com chamada forte e barra visual completa.",
     },
-  ] as Array<Pick<VideoRenderScene, "type" | "headline" | "subheadline" | "instruction">>;
+  ] as SceneTextDraft[];
 }
 
-function buildRenderPlan(input: GenerateVideoInput, mediaUrls: string[], script: string, productName: string, productDescription?: string): VideoRenderPlan {
+function buildRenderPlan(
+  input: GenerateVideoInput,
+  mediaUrls: string[],
+  script: string,
+  productName: string,
+  productDescription?: string,
+  creativePlan?: AIVideoCreativePlan,
+): VideoRenderPlan {
   const totalSeconds = secondsFromDuration(input.duration);
   const durations = sceneDurations(totalSeconds);
-  const sceneTexts = buildSceneTexts(input, productName, productDescription);
+  const sceneTexts = buildSceneTexts(input, productName, productDescription, creativePlan);
   const fallbackSource = mediaUrls[0] || "product_image";
 
   return {
@@ -124,7 +328,7 @@ function buildRenderPlan(input: GenerateVideoInput, mediaUrls: string[], script:
       id: `scene_${index + 1}`,
       ...scene,
       order: index + 1,
-      duration_seconds: durations[index] || 4,
+      duration_seconds: scene.duration_seconds || durations[index] || 4,
       source: mediaUrls[index] || fallbackSource,
     })),
     script,
@@ -235,13 +439,23 @@ export const videosService = {
     const mediaUrls = usableMedia.map((asset) => asset?.url || asset?.thumbnail_url).filter(Boolean) as string[];
     const mediaTitles = usableMedia.map((asset) => asset?.title || asset?.source || asset?.url).filter(Boolean) as string[];
     const prompt = buildVideoPrompt(payload, product.name, product.description, mediaTitles);
-    const aiResult = payload.script ? { text: payload.script, provider: "provided-script" } : await aiService.generateText(prompt);
-    const script = aiResult.text || prompt;
+    const aiResult = payload.script
+      ? { text: payload.script, provider: "provided-script" }
+      : await aiService.generateText(prompt, {
+          instructions: buildVideoCreativeInstructions(),
+          jsonSchema: {
+            name: "automedia_video_creative_plan",
+            schema: VIDEO_CREATIVE_PLAN_SCHEMA,
+            strict: true,
+          },
+        });
+    const creativePlan = payload.script ? undefined : parseCreativePlan(aiResult.text);
+    const script = payload.script || buildScriptFromCreativePlan(creativePlan) || aiResult.text || prompt;
     const productImageUrl = product.image_url || product.uploaded_image_url || "";
     const rawRenderMediaUrls = [...mediaUrls, productImageUrl].filter(Boolean);
     const mediaCache = await cacheRenderMediaUrls(rawRenderMediaUrls, workspaceId || product.workspace_id, product.id);
     const renderMediaUrls = mediaCache.urls;
-    const renderPlan = buildRenderPlan(payload, renderMediaUrls, script, product.name, product.description);
+    const renderPlan = buildRenderPlan(payload, renderMediaUrls, script, product.name, product.description, creativePlan);
     const scenePlan = buildScenePlan(renderPlan, mediaTitles);
     const costEstimate = estimateVideoCost(payload.duration);
     const platforms = payload.platforms?.length ? payload.platforms : payload.platform ? [payload.platform] : [];
@@ -270,6 +484,7 @@ export const videosService = {
         media_asset_ids: payload.media_asset_ids || [],
         reference_image_urls: renderMediaUrls,
         scene_plan: scenePlan,
+        creative_plan: creativePlan,
         cost_estimate: costEstimate,
       },
     });
@@ -294,6 +509,7 @@ export const videosService = {
         generation_version: 1,
         render_plan: renderPlan,
         scene_plan: scenePlan,
+        creative_plan: creativePlan,
         cost_estimate: costEstimate,
         prompt,
         media_asset_ids: payload.media_asset_ids || [],
@@ -333,6 +549,7 @@ export const videosService = {
         media_urls: renderMediaUrls,
         render_plan: renderPlan,
         scene_plan: scenePlan,
+        creative_plan: creativePlan,
         cost_estimate: costEstimate,
         script,
         ai_prompt: prompt,
@@ -392,6 +609,7 @@ export const videosService = {
       asset,
       script,
       render_plan: renderPlan,
+      creative_plan: creativePlan,
       provider: aiResult.provider,
     };
   },

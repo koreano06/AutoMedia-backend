@@ -67,7 +67,7 @@ describe("replicateKlingProvider", () => {
     await expect(replicateKlingProvider.generate({
       assetId: "asset_1",
       jobId: "job_1",
-      startImageUrl: "http://192.168.1.6:9000/automedia-media/produto.jpg",
+      startImageUrl: "http://192.168.1.42:9000/automedia-media/produto.jpg",
       prompt: "Gerar vídeo.",
     })).rejects.toMatchObject({
       code: "AI_VIDEO_START_IMAGE_NOT_PUBLIC",

@@ -64,7 +64,7 @@ Esse comando mascara valores sensíveis.
 No frontend local, use:
 
 ```env
-VITE_API_BASE_URL=http://192.168.1.6:3333/api
+VITE_API_BASE_URL=http://192.168.1.42:3333/api
 ```
 
 No frontend da Vercel, use uma URL pública/tunnel/HTTPS quando a API precisar funcionar fora da sua rede.
