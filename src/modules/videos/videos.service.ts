@@ -15,13 +15,16 @@ type AIVideoCreativeScene = {
   order: number;
   type: AIVideoSceneType;
   duration_seconds: number;
+  scene_goal: string;
   headline: string;
   subheadline: string;
   instruction: string;
+  visual_action: string;
   camera_direction: string;
   on_screen_text: string;
   voiceover: string;
   reference_asset_hint: string;
+  transition_to_next: string;
 };
 
 type AIVideoCreativePlan = {
@@ -67,25 +70,31 @@ const VIDEO_CREATIVE_PLAN_SCHEMA = {
           "order",
           "type",
           "duration_seconds",
+          "scene_goal",
           "headline",
           "subheadline",
           "instruction",
+          "visual_action",
           "camera_direction",
           "on_screen_text",
           "voiceover",
           "reference_asset_hint",
+          "transition_to_next",
         ],
         properties: {
           order: { type: "integer" },
           type: { type: "string", enum: ["hook", "benefit", "proof", "detail", "cta"] },
           duration_seconds: { type: "integer", minimum: 3, maximum: 10 },
+          scene_goal: { type: "string" },
           headline: { type: "string" },
           subheadline: { type: "string" },
           instruction: { type: "string" },
+          visual_action: { type: "string" },
           camera_direction: { type: "string" },
           on_screen_text: { type: "string" },
           voiceover: { type: "string" },
           reference_asset_hint: { type: "string" },
+          transition_to_next: { type: "string" },
         },
       },
     },
@@ -100,8 +109,12 @@ function buildVideoCreativeInstructions() {
     "Use apenas informacoes fornecidas no briefing. Nao invente preco, desconto, frete, garantia, estoque, marca, especificacoes tecnicas ou resultados nao informados.",
     "Nao cite marketplace, rede social, influenciador, cupom ou prazo se isso nao estiver no briefing.",
     "Cada cena precisa ser filmavel ou geravel por IA: unboxing, close do produto, demonstracao, controle/acessorio, resultado visual e CTA.",
+    "Construa uma progressao narrativa conectada: a cena seguinte deve continuar a acao anterior, nunca parecer um clipe aleatorio.",
+    "Cada cena precisa ter um objetivo unico: atrair atencao, revelar produto, demonstrar beneficio, provar uso, remover duvida ou chamar para acao.",
+    "Descreva a acao visual com verbos concretos: abrir, aproximar, conectar, pressionar, projetar, comparar, mostrar, apontar, finalizar.",
     "Escreva headlines curtas para tela, com ate 8 palavras. Subheadline ate 14 palavras.",
     "A instrucao de cada cena deve ser objetiva, visual e sem ambiguidades para um gerador de video.",
+    "Inclua uma transicao logica entre cenas para manter continuidade visual, como corte por movimento, zoom, match cut ou mudanca de foco.",
     "Evite exageros, spam, promessas absolutas, comparacoes nao comprovadas e claims sensiveis.",
     "O CTA deve ser natural e alinhado ao briefing, preferindo comentario, clique ou pedir link.",
     "Português do Brasil, tom comercial natural, claro e profissional.",
@@ -128,7 +141,8 @@ function buildVideoPrompt(input: GenerateVideoInput, productName: string, produc
     "BRIEFING OPERACIONAL PARA PLANO DE VIDEO COM IA",
     "",
     "Objetivo:",
-    "Criar um plano estruturado para um video vertical de divulgacao, pronto para gerar cenas por IA e renderizar no AutoMedia.",
+    "Criar um pre-roteiro estruturado para video vertical de divulgacao, pronto para gerar cenas por IA e renderizar no AutoMedia.",
+    "O resultado precisa funcionar para qualquer categoria de produto, mas sem ficar generico demais: use os dados do produto, midias e template para dar direcao real.",
     "",
     "Dados do anuncio:",
     `- Produto/anuncio: ${productName}`,
@@ -138,7 +152,7 @@ function buildVideoPrompt(input: GenerateVideoInput, productName: string, produc
     `- Formato: ${input.format || "reels"}`,
     `- Proporcao: ${input.ratio || "9:16"}`,
     `- Duracao desejada: ${durationSeconds}s`,
-    `- Quantidade esperada de cenas: ${sceneCount}`,
+    `- Quantidade esperada de cenas: ${sceneCount}. Nao use menos que 4 cenas, exceto se a duracao for extremamente curta.`,
     `- Ritmo: ${input.rhythm || "Cortes dinamicos, leitura facil e transicoes limpas"}`,
     `- Audio: ${input.audio || "Trilha moderna sem narracao obrigatoria"}`,
     `- Plataformas: ${platforms}`,
@@ -150,6 +164,8 @@ function buildVideoPrompt(input: GenerateVideoInput, productName: string, produc
     `- Promessa principal permitida: ${briefing.promise || firstSentence(productDescription) || "mostrar o beneficio principal do produto"}`,
     `- CTA permitido: ${briefing.cta || "Comente EU QUERO para receber o link"}`,
     `- Restricoes: ${briefing.restrictions || "nao inventar informacoes, nao exagerar beneficios, nao usar tom apelativo"}`,
+    `- Dor ou curiosidade inicial: ${briefing.painPoint || "mostrar por que o produto merece atencao nos primeiros segundos"}`,
+    `- Objeção que o video deve reduzir: ${briefing.objection || "deixar claro como o produto e usado e qual valor ele entrega"}`,
     "",
     "Materiais visuais disponiveis:",
     `- Midias selecionadas: ${mediaTitles.length ? mediaTitles.join(" | ") : "imagem principal do anuncio ou imagem enviada pelo usuario"}`,
@@ -158,8 +174,11 @@ function buildVideoPrompt(input: GenerateVideoInput, productName: string, produc
     "",
     "Regras obrigatorias de saida:",
     "- Responder somente no JSON do schema.",
-    "- Criar cenas na ordem logica: gancho, demonstracao/beneficio, prova/detalhe, CTA.",
-    "- Cada cena precisa conter instrucao visual fechada, camera_direction, texto na tela e narracao curta.",
+    "- Criar cenas na ordem logica: gancho, revelacao do produto, demonstracao/beneficio, prova/detalhe, CTA.",
+    "- Cada cena precisa conter: objetivo da cena, acao visual, instrucao fechada, camera_direction, texto na tela, narracao curta e transicao para a proxima.",
+    "- O video deve parecer uma unica historia curta, nao uma lista de takes desconectados.",
+    "- Se o template for unboxing/review, use linguagem de vendedor demonstrando o produto de forma natural.",
+    "- Se o video tiver 15 a 20 segundos, prefira 4 ou 5 cenas de 3 a 5 segundos com conexao clara entre elas.",
     "- Se alguma informacao nao existir, use uma formulacao neutra. Nao invente dado tecnico.",
     "- Nao incluir explicacoes fora do JSON.",
   ].join("\n");
@@ -227,13 +246,16 @@ function parseCreativePlan(value?: string): AIVideoCreativePlan | undefined {
         order: Number(scene.order || index + 1),
         type: normalizeSceneType(scene.type),
         duration_seconds: Math.min(10, Math.max(3, Number(scene.duration_seconds || 5))),
+        scene_goal: compactText(scene.scene_goal, "Conduzir a narrativa do produto."),
         headline: limitText(scene.headline || `Cena ${index + 1}`, 48),
         subheadline: limitText(scene.subheadline || "", 76),
         instruction: compactText(scene.instruction, "Mostrar o produto com clareza."),
+        visual_action: compactText(scene.visual_action, "Mostrar o produto em uso real."),
         camera_direction: compactText(scene.camera_direction, "Camera vertical, movimento suave e foco no produto."),
         on_screen_text: limitText(scene.on_screen_text || scene.headline || "", 72),
         voiceover: compactText(scene.voiceover, ""),
         reference_asset_hint: compactText(scene.reference_asset_hint, "Usar a imagem mais proxima do produto."),
+        transition_to_next: compactText(scene.transition_to_next, "Corte suave mantendo continuidade do produto."),
       })),
     };
   } catch {
@@ -260,11 +282,14 @@ function buildSceneTexts(input: GenerateVideoInput, productName: string, product
       headline: limitText(scene.headline, 48),
       subheadline: limitText(scene.subheadline || scene.on_screen_text, 76),
       instruction: [
+        scene.scene_goal ? `Objetivo da cena: ${scene.scene_goal}` : "",
+        scene.visual_action ? `Acao visual: ${scene.visual_action}` : "",
         scene.instruction,
         scene.camera_direction ? `Camera: ${scene.camera_direction}` : "",
         scene.on_screen_text ? `Texto na tela: ${scene.on_screen_text}` : "",
         scene.voiceover ? `Narracao: ${scene.voiceover}` : "",
         scene.reference_asset_hint ? `Referencia visual: ${scene.reference_asset_hint}` : "",
+        scene.transition_to_next ? `Transicao: ${scene.transition_to_next}` : "",
       ].filter(Boolean).join(" "),
       duration_seconds: scene.duration_seconds,
     })) as SceneTextDraft[];

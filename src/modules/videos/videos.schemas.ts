@@ -7,6 +7,8 @@ const briefingSchema = z.object({
   promise: z.string().optional(),
   cta: z.string().optional(),
   restrictions: z.string().optional(),
+  painPoint: z.string().optional(),
+  objection: z.string().optional(),
   extra: z.string().optional(),
 }).partial().default({});
 
