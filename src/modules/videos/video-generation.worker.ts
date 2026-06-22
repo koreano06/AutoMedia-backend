@@ -157,6 +157,8 @@ export function startVideoGenerationWorker() {
         status: "generating",
       });
 
+      let externalAiFallbackReason = "";
+
       if (aiVideoService.shouldUseExternalProvider()) {
         try {
           await jobsRepository.update(payload.job_id, {
@@ -324,12 +326,13 @@ export function startVideoGenerationWorker() {
           return { asset_id: updatedAsset.id, url: upload.url, ai_video_provider: aiVideos[0].provider, segments: aiVideos.length };
         } catch (error) {
           if (!aiVideoService.shouldFallbackToFfmpeg(error)) throw error;
+          externalAiFallbackReason = error instanceof Error ? error.message : "Falha no provedor externo de vídeo IA";
 
           await jobsRepository.update(payload.job_id, {
             status: "rendering",
             progress: 40,
             payload: withPayloadStage(payload, "fallback_ffmpeg", {
-              ai_video_fallback_reason: error instanceof Error ? error.message : "Falha no provedor externo de vídeo IA",
+              ai_video_fallback_reason: externalAiFallbackReason,
             }),
           });
         }
@@ -350,7 +353,7 @@ export function startVideoGenerationWorker() {
         status: "uploading",
         progress: 82,
         payload: withPayloadStage(payload, "uploading_to_library", {
-          ai_video_fallback_reason: payload.cost_estimate?.provider === "replicate_kling" ? "Render finalizado pelo FFmpeg" : undefined,
+          ai_video_fallback_reason: externalAiFallbackReason || (payload.cost_estimate?.provider === "replicate_kling" ? "Render finalizado pelo FFmpeg" : undefined),
         }),
       });
 
@@ -411,6 +414,9 @@ export function startVideoGenerationWorker() {
         media_asset_id: payload.asset_id,
         result_url: upload.url,
         completed_at: new Date().toISOString(),
+        payload: withPayloadStage(payload, "completed", {
+          ai_video_fallback_reason: externalAiFallbackReason || undefined,
+        }),
         result: {
           asset_id: payload.asset_id,
           storage_provider: upload.provider,
@@ -419,6 +425,7 @@ export function startVideoGenerationWorker() {
           height: rendered.height,
           cost: fallbackCost,
           fallback: fallbackCost.fallback,
+          fallback_reason: externalAiFallbackReason || undefined,
         },
       });
 
