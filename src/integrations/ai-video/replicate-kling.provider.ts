@@ -65,13 +65,28 @@ function extractOutputUrl(output: ReplicatePrediction["output"]) {
 
 function buildPrompt(input: AIVideoInput) {
   const sceneDirections = input.renderPlan?.scenes
-    ?.map((scene) => `${scene.order}. ${scene.type}: ${scene.headline}${scene.subheadline ? ` - ${scene.subheadline}` : ""}`)
+    ?.map((scene) => [
+      `${scene.order}. ${scene.type}: ${scene.headline}${scene.subheadline ? ` - ${scene.subheadline}` : ""}`,
+      scene.visual_action ? `Action: ${scene.visual_action}` : "",
+      scene.prompt_video_ia ? `Scene prompt: ${scene.prompt_video_ia}` : "",
+      scene.plano_camera ? `Camera plan: ${scene.plano_camera}` : "",
+      scene.movimento_camera ? `Movement: ${scene.movimento_camera}` : "",
+      scene.ambiente ? `Environment: ${scene.ambiente}` : "",
+      scene.iluminacao ? `Lighting: ${scene.iluminacao}` : "",
+      scene.visual_fidelity ? `Fidelity: ${scene.visual_fidelity}` : "",
+      scene.restricoes_ia ? `Restrictions: ${scene.restricoes_ia}` : "",
+      scene.transition_to_next ? `Transition: ${scene.transition_to_next}` : "",
+    ].filter(Boolean).join(". "))
     .join(" | ");
 
   return [
     `Create a professional vertical product advertising video for: ${input.productName || "product"}.`,
     "Style: realistic unboxing/product demo, cinematic ecommerce lighting, natural camera movement, premium social media ad.",
     "Motion: slow push-in, handheld product reveal, subtle parallax, clean background, no distorted text.",
+    "Composition: strict vertical 9:16, product visible in the safe area, clear readable large text only if needed, no clutter.",
+    "Mandatory product fidelity: keep the exact same product from the user's reference image and platform request. Do not change model, color, shape, scale, texture, packaging, screen, remote/control, visible logo, accessories, buttons or physical details. If a detail is unclear, simplify the shot instead of inventing a different or generic product.",
+    "Continuity: every shot must feel like part of the same short ad, with matching lighting, environment, product state and camera style.",
+    "Avoid: generic substitute products, extra accessories, invented labels, small unreadable text, deformed hands, unrelated props, fake UI screens, sudden scene jumps.",
     sceneDirections ? `Storyboard: ${sceneDirections}.` : "",
     input.prompt,
   ].filter(Boolean).join("\n");

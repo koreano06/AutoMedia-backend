@@ -37,11 +37,23 @@ function compactText(value?: string) {
 
 function sceneSummary(scene: VideoRenderScene) {
   return [
-    `${scene.order}. ${scene.type}`,
-    scene.headline,
-    scene.subheadline,
-    scene.instruction,
-  ].filter(Boolean).join(" - ");
+    `Scene ${scene.order} (${scene.type})`,
+    scene.scene_goal ? `Goal: ${scene.scene_goal}` : "",
+    scene.headline ? `Headline: ${scene.headline}` : "",
+    scene.subheadline ? `Subheadline: ${scene.subheadline}` : "",
+    scene.visual_action ? `Visual action: ${scene.visual_action}` : "",
+    scene.instruction ? `Direction: ${scene.instruction}` : "",
+    scene.plano_camera ? `9:16 camera plan: ${scene.plano_camera}` : "",
+    scene.movimento_camera ? `Camera movement: ${scene.movimento_camera}` : "",
+    scene.ambiente ? `Environment: ${scene.ambiente}` : "",
+    scene.iluminacao ? `Lighting: ${scene.iluminacao}` : "",
+    scene.on_screen_text ? `On-screen text: ${scene.on_screen_text}` : "",
+    scene.voiceover ? `Voiceover intent: ${scene.voiceover}` : "",
+    scene.visual_fidelity ? `Product fidelity: ${scene.visual_fidelity}` : "",
+    scene.restricoes_ia ? `AI restrictions: ${scene.restricoes_ia}` : "",
+    scene.prompt_video_ia ? `Final scene prompt: ${scene.prompt_video_ia}` : "",
+    scene.transition_to_next ? `Transition: ${scene.transition_to_next}` : "",
+  ].filter(Boolean).join(". ");
 }
 
 function scenesForSegment(renderPlan: VideoRenderPlan | undefined, segmentIndex: number, totalSegments: number) {
@@ -69,6 +81,19 @@ function buildSegmentPrompt(input: {
   const continuityInstruction = input.totalSegments > 1
     ? `This is segment ${segmentNumber} of ${input.totalSegments} of the same final video. Keep the same product, environment, lighting, hands, camera style and visual identity.`
     : "This is the full video.";
+  const fidelityInstruction = [
+    "Strict product fidelity rule:",
+    "The product must remain extremely faithful to the user's reference images and platform request.",
+    "Do not change product model, color, shape, scale, texture, packaging, screen, remote/control, visible logo, accessories, buttons or physical details.",
+    "If any visual detail is unclear, use a simpler shot that preserves the real product instead of inventing a generic replacement.",
+  ].join(" ");
+  const productionRules = [
+    "Vertical 9:16 production rules:",
+    "Keep the product centered or intentionally framed in the vertical safe area.",
+    "Avoid tiny text, unreadable interface details, distorted hands, invented logos, fake product labels, extra accessories and unrelated props.",
+    "Use one clear camera movement per scene and maintain continuity between shots.",
+    "The video must look like a realistic product demo/unboxing ad, not an abstract animation.",
+  ].join(" ");
   const openingInstruction = segmentNumber === 1
     ? "Start with the hook and product reveal. Do not show the final CTA yet unless this is the only segment."
     : "Continue naturally from the previous segment. Do not repeat the opening unboxing unless it is needed for continuity.";
@@ -79,9 +104,11 @@ function buildSegmentPrompt(input: {
   return [
     continuityInstruction,
     `Generate only ${input.segmentSeconds} seconds for this segment.`,
+    fidelityInstruction,
+    productionRules,
     openingInstruction,
     closingInstruction,
-    selectedScenes.length ? `Scenes to cover in this segment: ${sceneText}.` : "",
+    selectedScenes.length ? `Scenes to cover in this segment, in order, with no disconnected takes:\n${sceneText}` : "",
     "The final platform will concatenate all segments, so each segment must look like part of one continuous product ad.",
     basePrompt,
   ].filter(Boolean).join("\n\n");

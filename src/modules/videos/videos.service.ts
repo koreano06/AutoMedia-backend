@@ -24,6 +24,13 @@ type AIVideoCreativeScene = {
   on_screen_text: string;
   voiceover: string;
   reference_asset_hint: string;
+  visual_fidelity: string;
+  plano_camera: string;
+  movimento_camera: string;
+  ambiente: string;
+  iluminacao: string;
+  restricoes_ia: string;
+  prompt_video_ia: string;
   transition_to_next: string;
 };
 
@@ -39,9 +46,25 @@ type AIVideoCreativePlan = {
   scenes: AIVideoCreativeScene[];
 };
 
-type SceneTextDraft = Pick<VideoRenderScene, "type" | "headline" | "subheadline" | "instruction"> & {
-  duration_seconds?: number;
-};
+type SceneTextDraft = Pick<VideoRenderScene, "type" | "headline" | "subheadline" | "instruction"> &
+  Partial<Pick<
+    VideoRenderScene,
+    | "duration_seconds"
+    | "scene_goal"
+    | "visual_action"
+    | "camera_direction"
+    | "on_screen_text"
+    | "voiceover"
+    | "reference_asset_hint"
+    | "visual_fidelity"
+    | "transition_to_next"
+    | "prompt_video_ia"
+    | "plano_camera"
+    | "movimento_camera"
+    | "ambiente"
+    | "iluminacao"
+    | "restricoes_ia"
+  >>;
 
 const VIDEO_CREATIVE_PLAN_SCHEMA = {
   type: "object",
@@ -79,6 +102,13 @@ const VIDEO_CREATIVE_PLAN_SCHEMA = {
           "on_screen_text",
           "voiceover",
           "reference_asset_hint",
+          "visual_fidelity",
+          "plano_camera",
+          "movimento_camera",
+          "ambiente",
+          "iluminacao",
+          "restricoes_ia",
+          "prompt_video_ia",
           "transition_to_next",
         ],
         properties: {
@@ -94,6 +124,13 @@ const VIDEO_CREATIVE_PLAN_SCHEMA = {
           on_screen_text: { type: "string" },
           voiceover: { type: "string" },
           reference_asset_hint: { type: "string" },
+          visual_fidelity: { type: "string" },
+          plano_camera: { type: "string" },
+          movimento_camera: { type: "string" },
+          ambiente: { type: "string" },
+          iluminacao: { type: "string" },
+          restricoes_ia: { type: "string" },
+          prompt_video_ia: { type: "string" },
           transition_to_next: { type: "string" },
         },
       },
@@ -102,23 +139,33 @@ const VIDEO_CREATIVE_PLAN_SCHEMA = {
 };
 
 function buildVideoCreativeInstructions() {
-  return [
-    "Voce e diretor criativo, roteirista de performance e estrategista de social commerce.",
-    "Sua tarefa e transformar um anuncio base em um plano de video curto, realista e publicavel para redes sociais.",
-    "Responda somente JSON valido obedecendo exatamente ao schema solicitado.",
-    "Use apenas informacoes fornecidas no briefing. Nao invente preco, desconto, frete, garantia, estoque, marca, especificacoes tecnicas ou resultados nao informados.",
-    "Nao cite marketplace, rede social, influenciador, cupom ou prazo se isso nao estiver no briefing.",
-    "Cada cena precisa ser filmavel ou geravel por IA: unboxing, close do produto, demonstracao, controle/acessorio, resultado visual e CTA.",
-    "Construa uma progressao narrativa conectada: a cena seguinte deve continuar a acao anterior, nunca parecer um clipe aleatorio.",
-    "Cada cena precisa ter um objetivo unico: atrair atencao, revelar produto, demonstrar beneficio, provar uso, remover duvida ou chamar para acao.",
-    "Descreva a acao visual com verbos concretos: abrir, aproximar, conectar, pressionar, projetar, comparar, mostrar, apontar, finalizar.",
-    "Escreva headlines curtas para tela, com ate 8 palavras. Subheadline ate 14 palavras.",
-    "A instrucao de cada cena deve ser objetiva, visual e sem ambiguidades para um gerador de video.",
-    "Inclua uma transicao logica entre cenas para manter continuidade visual, como corte por movimento, zoom, match cut ou mudanca de foco.",
-    "Evite exageros, spam, promessas absolutas, comparacoes nao comprovadas e claims sensiveis.",
-    "O CTA deve ser natural e alinhado ao briefing, preferindo comentario, clique ou pedir link.",
-    "Português do Brasil, tom comercial natural, claro e profissional.",
-  ].join(" ");
+  const systemInstructions = [
+    "Voce e um diretor criativo senior, roteirista de performance e estrategista de videos curtos para venda de produtos. Sua unica funcao e transformar um briefing de produto em um plano de video completo, cena a cena, pronto para filmagem humana, edicao vertical curta e geracao por IA. Voce nao faz perguntas, nao pede esclarecimentos, nao apresenta opcoes e nao entrega rascunhos. Voce executa com base no briefing recebido e usa regras de fallback quando houver lacunas.",
+    "Regra central: se nao esta literalmente declarado no briefing, nao existe como fato. Informacoes ausentes podem ser omitidas, ocultadas por enquadramento, substituidas por descricoes neutras ou registradas como lacunas, mas nunca inventadas. Transforme somente informacoes declaradas em acoes visuais observaveis, narracao segura, textos objetivos e instrucoes executaveis para video por IA.",
+    "Responda exclusivamente com um unico objeto JSON valido e diretamente parseavel por JSON.parse(). Nao use markdown, crases, comentarios, texto antes ou depois do JSON, virgulas finais ou campos fora do schema solicitado. A resposta inteira e invalida se o JSON nao puder ser parseado.",
+    "Obedeca exatamente ao schema fornecido pela API: hook, promise, target_audience, tone, cta, caption, script, safety_notes e scenes. Cada item de scenes deve conter exatamente os campos pedidos no schema: order, type, duration_seconds, scene_goal, headline, subheadline, instruction, visual_action, camera_direction, on_screen_text, voiceover, reference_asset_hint, visual_fidelity, plano_camera, movimento_camera, ambiente, iluminacao, restricoes_ia, prompt_video_ia e transition_to_next.",
+    "Quando uma informacao nao estiver declarada, use fallback neutro: publico adulto generico, tom claro e direto, estetica limpa de produto, ritmo moderado, CTA de baixa friccao e ambiente neutro. Nao invente marca, preco, desconto, frete, garantia, estoque, especificacao tecnica, prazo, disponibilidade, marketplace, rede social, cupom, depoimento, avaliacao ou dado comercial nao declarado.",
+    "Fidelidade visual absoluta: toda aparicao do produto deve preservar os atributos visuais declarados ou visiveis nas imagens do usuario: modelo, formato, proporcao, cor, acabamento, material, textura, logotipo, tela, display, embalagem, acessorios, botoes, conectores, partes moveis e componentes. Se algo nao estiver claro, use angulo lateral, fundo desfocado, recorte parcial, macro de area conhecida, silhueta, contraluz ou ausencia do elemento.",
+    "E proibido usar superlativos absolutos e claims nao comprovados como melhor, unico, perfeito, revolucionario, imbativel, numero um, garantia de resultado, funciona para todos, zero falhas ou comparacao direta sem dados declarados. Quando houver risco de claim, substitua por descricao visual observavel: nao diga que e facil, mostre um gesto simples; nao diga que e resistente, mostre acabamento em close; nao diga que e silencioso, mostre uso sem afirmar silencio absoluto.",
+    "Nao use urgencia artificial como so hoje, ultimas unidades, oferta relampago, por tempo limitado ou equivalente sem declaracao literal. O CTA deve nascer do beneficio demonstrado. Use CLICAR NO LINK apenas se houver destino declarado. Sem destino declarado, prefira SALVAR, COMENTAR ou pedir o link.",
+    "Escolha uma palavra-chave central derivada literalmente do briefing ou da funcao principal declarada. Essa palavra-chave deve orientar hook, promise, headline, voiceover, caption e CTA. Nao alterne beneficios sem necessidade. Cada cena deve avancar a narrativa e nao repetir a mesma promessa da cena anterior.",
+    "A progressao narrativa obrigatoria e: 1 gancho visual; 2 apresentacao contextual do produto; 3 exploracao de detalhe fisico ou unboxing se houver embalagem descrita; 4 demonstracao de uso ou interacao observavel; 5 prova ou resultado visual concreto; 6 CTA integrado. Para videos de 15 a 20 segundos, comprima em 4 ou 5 cenas mantendo a ordem: gancho, revelacao/detalhe, demonstracao/resultado, CTA.",
+    "Cada cena deve ter exatamente um objetivo dominante no campo scene_goal: ATRAIR ATENCAO, REVELAR PRODUTO, EXPLORAR DETALHE, DEMONSTRAR USO, EXIBIR RESULTADO, REMOVER DUVIDA ou CHAMAR PARA ACAO. ATRAIR ATENCAO so na primeira cena; CHAMAR PARA ACAO so na ultima.",
+    "O campo visual_action deve comecar com um verbo fisico e observavel em maiusculas: REVELA, APROXIMA, DESLIZA, PRESSIONA, GIRA, PROJETA, COMPARA, SEGURA, CONECTA, ABRE, APONTA, FINALIZA, POSICIONA, RETIRA, ENCAIXA, DESDOBRA, VESTE, APLICA ou ORGANIZA. Evite acoes vagas como mostrar, apresentar ou ver.",
+    "Use apenas estes planos no campo camera_direction: GRANDE PLANO GERAL, PLANO GERAL, PLANO MEDIO, CLOSE, MACRO OU PLANO DETALHE, POV. Inclua tambem movimento principal simples: CAMERA ESTATICA, ZOOM IN PROGRESSIVO, ZOOM OUT PROGRESSIVO, PAN LATERAL, TILT, RACK FOCUS, DOLLY IN ou TRAVELLING LATERAL. Especifique ponto inicial, ponto final e velocidade relativa.",
+    "Cada instruction precisa descrever ambiente, superficie de apoio, fundo, props ou ausencia de props, presenca humana ou ausencia de humanos, iluminacao e continuidade. Use iluminacao limpa e coerente: luz natural lateral, estudio frontal difuso, backlight, ring light, dramatica com sombra direcional ou neutra de produto.",
+    "Preencha plano_camera com o enquadramento exato para 9:16, incluindo distancia do produto, area segura de texto e ponto de foco. Preencha movimento_camera com um unico movimento simples e executavel. Preencha ambiente com cenario realista e poucos elementos. Preencha iluminacao com uma fonte principal clara e continuidade entre cenas.",
+    "Headlines devem ter no maximo 8 palavras. Subheadline deve ter no maximo 14 palavras. on_screen_text deve ser curto, legivel, sem informacao nova e posicionado fora do produto, logo, display ou area principal da acao. Prefira zona segura do terco inferior em formato vertical 9:16.",
+    "Cada voiceover deve comecar com verbo de acao, caber em fala natural de 3 a 5 segundos, complementar a headline e nao repetir exatamente o texto em tela. Use portugues do Brasil, tom comercial natural, sem girias, sem emojis escritos, sem exagero e sem pressao emocional.",
+    "Cada instruction deve funcionar tambem como prompt de video por IA: sujeito, acao, plano, movimento, ambiente, iluminacao, estilo visual, continuidade e restricoes. Evite multidoes, maos complexas, textos pequenos, reflexos intensos, interfaces inventadas, transformacoes impossiveis, muitos objetos simultaneos e acoes paralelas.",
+    "O campo prompt_video_ia deve ser a versao final e autocontida da cena para o gerador de video. Ele deve combinar sujeito, acao, plano_camera, movimento_camera, ambiente, iluminacao, visual_fidelity, restricoes_ia e transicao. Escreva em portugues claro, sem lista, sem markdown, sem mencionar campos internos e sem pedir coisas impossiveis.",
+    "Cada transition_to_next deve declarar uma tecnica simples e a logica narrativa: CORTE SECO, CORTE POR MOVIMENTO, ZOOM IN DE TRANSICAO, ZOOM OUT DE TRANSICAO, MATCH CUT, RACK FOCUS DE TRANSICAO ou FADE. A transicao precisa conectar a acao anterior com a proxima, evitando cortes aleatorios.",
+    "safety_notes deve conter 3 a 5 notas especificas e acionaveis para prevenir problemas reais de geracao: continuidade de posicao, cor, luz, estado do produto, embalagem, maos, reflexos, logos, telas, acessorios, props, corte, velocidade, color grade e legibilidade. Nao escreva notas genericas.",
+    "Antes de entregar, valide internamente: JSON parseavel, schema completo, duracao coerente, quantidade correta de cenas, ordem narrativa, objetivo unico por cena, visual_action com verbo permitido, camera_direction permitido, ausencia de informacoes inventadas, ausencia de claims proibidos, fidelidade ao produto, instrucoes executaveis e CTA contextual.",
+    "A entrega so esta pronta quando servir simultaneamente como roteiro criativo, guia de filmagem, plano de edicao, prompt de geracao por IA e peca comercial segura. Entregue somente o JSON final.",
+  ];
+
+  return systemInstructions.join(" ");
 }
 
 function buildVideoPrompt(input: GenerateVideoInput, productName: string, productDescription?: string, mediaTitles: string[] = []) {
@@ -128,13 +175,20 @@ function buildVideoPrompt(input: GenerateVideoInput, productName: string, produc
   const durationSeconds = secondsFromDuration(input.duration);
   const sceneCount = Math.min(6, Math.max(4, Math.ceil(durationSeconds / 5)));
   const templateGuide: Record<string, string> = {
-    unboxing: "Abrir com caixa/embalagem, revelar o produto, mostrar acessorios, demonstrar uso e fechar com CTA.",
-    demonstracao: "Apresentar problema/contexto, mostrar recurso principal, demonstrar uso real, exibir resultado e fechar com CTA.",
-    "antes-depois": "Mostrar situacao antes, introduzir produto, demonstrar transformacao visual e encerrar com resultado/CTA.",
-    oferta: "Gancho de oportunidade, beneficio principal, prova visual, urgencia moderada e CTA sem linguagem agressiva.",
-    review: "Vendedor apresenta o produto, mostra detalhes, explica beneficio, demonstra uso e recomenda proximo passo.",
-    marketplace: "Comecar pelo uso pratico, reforcar clareza visual, destacar beneficio e orientar o usuario a pedir o link.",
-    product: "Mostrar produto em contexto real, explicar beneficio, demonstrar uso e finalizar com CTA.",
+    unboxing:
+      "Criar narrativa de descoberta: caixa ou embalagem em cena somente se existir nas imagens/briefing, maos abrindo ou revelando o produto, close em detalhes reais, demonstracao curta de uso e CTA natural. Nao inventar acessorios ou embalagem nao declarados.",
+    demonstracao:
+      "Mostrar o produto resolvendo uma situacao pratica: contexto inicial, aproximacao do produto, interacao real observavel, detalhe funcional visivel, resultado visual concreto e CTA. Nao afirmar desempenho tecnico sem dado declarado.",
+    "antes-depois":
+      "Construir comparacao visual segura: situacao inicial neutra, entrada do produto, uso/interacao observavel, mudanca visual permitida pelo briefing e fechamento com CTA. Nao inventar transformacao, resultado garantido ou comparacao com concorrente.",
+    oferta:
+      "Criar video direto de oportunidade sem urgencia falsa: produto em destaque, beneficio principal declarado, prova visual do produto, informacao comercial apenas se estiver no briefing e CTA claro. Nao criar desconto, preco, prazo ou escassez.",
+    review:
+      "Simular review de vendedor/creator: produto em maos, fala consultiva, close em acabamento e partes visiveis, demonstracao realista, objecao respondida se declarada e recomendacao final natural. Nao criar depoimento, nota ou avaliacao falsa.",
+    marketplace:
+      "Criar criativo para social commerce: produto centralizado, beneficio principal em texto curto, detalhes visuais confiaveis, uso pratico e CTA para pedir link quando nao houver loja declarada. Evitar poluicao visual e claims nao comprovados.",
+    product:
+      "Criar apresentacao limpa do produto: revelacao visual forte, detalhe fisico, uso ou contexto realista, beneficio declarado e CTA simples. Manter foco total na fidelidade visual das imagens enviadas.",
   };
 
   return [
@@ -162,13 +216,14 @@ function buildVideoPrompt(input: GenerateVideoInput, productName: string, produc
     `- Tom de voz: ${briefing.tone || "natural, vendedor consultivo, direto e confiavel"}`,
     `- Objetivo: ${briefing.objective || "gerar interesse e pedido de link"}`,
     `- Promessa principal permitida: ${briefing.promise || firstSentence(productDescription) || "mostrar o beneficio principal do produto"}`,
-    `- CTA permitido: ${briefing.cta || "Comente EU QUERO para receber o link"}`,
+    `- CTA permitido: ${briefing.cta || "Use CTA de baixa friccao: SALVAR, COMENTAR ou pedir o link, sem inventar canal de compra."}`,
     `- Restricoes: ${briefing.restrictions || "nao inventar informacoes, nao exagerar beneficios, nao usar tom apelativo"}`,
     `- Dor ou curiosidade inicial: ${briefing.painPoint || "mostrar por que o produto merece atencao nos primeiros segundos"}`,
     `- Objeção que o video deve reduzir: ${briefing.objection || "deixar claro como o produto e usado e qual valor ele entrega"}`,
     "",
     "Materiais visuais disponiveis:",
     `- Midias selecionadas: ${mediaTitles.length ? mediaTitles.join(" | ") : "imagem principal do anuncio ou imagem enviada pelo usuario"}`,
+    "- Regra de fidelidade visual: as imagens do usuario sao referencia obrigatoria de identidade do produto. O gerador de video deve preservar aparencia, cor, proporcao, textura, embalagem, acessorios, controle, tela, botoes, logo aparente e qualquer detalhe visivel. Nao substituir por produto parecido ou versao generica.",
     `- Direcao visual adicional: ${input.visual_prompt || "produto em destaque, ambiente realista, texto legivel e composicao limpa"}`,
     `- Observacoes livres do usuario: ${input.briefing || briefing.extra || "sem observacoes extras"}`,
     "",
@@ -176,6 +231,10 @@ function buildVideoPrompt(input: GenerateVideoInput, productName: string, produc
     "- Responder somente no JSON do schema.",
     "- Criar cenas na ordem logica: gancho, revelacao do produto, demonstracao/beneficio, prova/detalhe, CTA.",
     "- Cada cena precisa conter: objetivo da cena, acao visual, instrucao fechada, camera_direction, texto na tela, narracao curta e transicao para a proxima.",
+    "- Cada cena tambem precisa conter visual_fidelity explicando quais detalhes das imagens do usuario devem permanecer identicos.",
+    "- Cada cena deve conter plano_camera, movimento_camera, ambiente, iluminacao, restricoes_ia e prompt_video_ia. O prompt_video_ia deve ser pronto para ser enviado ao gerador de video sem depender de contexto externo.",
+    "- Todas as cenas devem ser pensadas para video vertical 9:16: produto central, area de texto segura, pouco texto, leitura rapida e composicao limpa.",
+    "- A cena deve ser executavel por IA sem ambiguidade: descreva sujeito, acao, plano, movimento, ambiente, iluminacao, continuidade e restricoes visuais.",
     "- O video deve parecer uma unica historia curta, nao uma lista de takes desconectados.",
     "- Se o template for unboxing/review, use linguagem de vendedor demonstrando o produto de forma natural.",
     "- Se o video tiver 15 a 20 segundos, prefira 4 ou 5 cenas de 3 a 5 segundos com conexao clara entre elas.",
@@ -217,6 +276,32 @@ function normalizeSceneType(value?: string): AIVideoSceneType {
   return "detail";
 }
 
+function buildSceneAiPrompt(input: {
+  productName?: string;
+  visualAction?: string;
+  instruction?: string;
+  planoCamera?: string;
+  movimentoCamera?: string;
+  ambiente?: string;
+  iluminacao?: string;
+  visualFidelity?: string;
+  restricoesIa?: string;
+  transition?: string;
+}) {
+  return compactText([
+    `Video vertical 9:16 de demonstracao realista do produto ${input.productName || "do anuncio"}.`,
+    input.visualAction,
+    input.instruction,
+    input.planoCamera ? `Enquadramento: ${input.planoCamera}.` : "",
+    input.movimentoCamera ? `Movimento: ${input.movimentoCamera}.` : "",
+    input.ambiente ? `Ambiente: ${input.ambiente}.` : "",
+    input.iluminacao ? `Iluminacao: ${input.iluminacao}.` : "",
+    input.visualFidelity ? `Fidelidade visual obrigatoria: ${input.visualFidelity}.` : "",
+    input.restricoesIa ? `Restricoes: ${input.restricoesIa}.` : "",
+    input.transition ? `Finalizar com ${input.transition}.` : "",
+  ].filter(Boolean).join(" "));
+}
+
 function extractJsonText(value?: string) {
   const text = compactText(value);
   if (!text) return "";
@@ -242,21 +327,50 @@ function parseCreativePlan(value?: string): AIVideoCreativePlan | undefined {
       caption: compactText(parsed.caption, ""),
       script: compactText(parsed.script, ""),
       safety_notes: Array.isArray(parsed.safety_notes) ? parsed.safety_notes.map((note) => compactText(note)).filter(Boolean) : [],
-      scenes: parsed.scenes.slice(0, 6).map((scene, index) => ({
-        order: Number(scene.order || index + 1),
-        type: normalizeSceneType(scene.type),
-        duration_seconds: Math.min(10, Math.max(3, Number(scene.duration_seconds || 5))),
-        scene_goal: compactText(scene.scene_goal, "Conduzir a narrativa do produto."),
-        headline: limitText(scene.headline || `Cena ${index + 1}`, 48),
-        subheadline: limitText(scene.subheadline || "", 76),
-        instruction: compactText(scene.instruction, "Mostrar o produto com clareza."),
-        visual_action: compactText(scene.visual_action, "Mostrar o produto em uso real."),
-        camera_direction: compactText(scene.camera_direction, "Camera vertical, movimento suave e foco no produto."),
-        on_screen_text: limitText(scene.on_screen_text || scene.headline || "", 72),
-        voiceover: compactText(scene.voiceover, ""),
-        reference_asset_hint: compactText(scene.reference_asset_hint, "Usar a imagem mais proxima do produto."),
-        transition_to_next: compactText(scene.transition_to_next, "Corte suave mantendo continuidade do produto."),
-      })),
+      scenes: parsed.scenes.slice(0, 6).map((scene, index) => {
+        const visualAction = compactText(scene.visual_action, "REVELA o produto em contexto real e com poucos elementos.");
+        const instruction = compactText(scene.instruction, "Mostrar o produto com clareza em composicao vertical limpa.");
+        const planoCamera = compactText(scene.plano_camera, scene.camera_direction || "CLOSE vertical 9:16, produto centralizado, texto fora da area principal e foco no detalhe mais reconhecivel.");
+        const movimentoCamera = compactText(scene.movimento_camera, "ZOOM IN PROGRESSIVO lento, sem cortes bruscos e mantendo o produto no centro.");
+        const ambiente = compactText(scene.ambiente, "Ambiente realista, fundo limpo, superficie neutra e poucos props para nao competir com o produto.");
+        const iluminacao = compactText(scene.iluminacao, "Luz principal difusa, contraste moderado, reflexos controlados e continuidade de cor entre cenas.");
+        const visualFidelity = compactText(scene.visual_fidelity, "Manter o produto extremamente fiel as imagens do usuario: mesma cor, formato, proporcao, textura, embalagem, acessorios e detalhes fisicos.");
+        const restricoesIa = compactText(scene.restricoes_ia, "Nao alterar modelo, cor, proporcao, logo, botoes, tela, acessorios ou embalagem; nao inventar texto pequeno, pessoas extras ou objetos nao declarados.");
+        const transition = compactText(scene.transition_to_next, "CORTE POR MOVIMENTO mantendo continuidade do produto.");
+
+        return {
+          order: Number(scene.order || index + 1),
+          type: normalizeSceneType(scene.type),
+          duration_seconds: Math.min(10, Math.max(3, Number(scene.duration_seconds || 5))),
+          scene_goal: compactText(scene.scene_goal, "Conduzir a narrativa do produto."),
+          headline: limitText(scene.headline || `Cena ${index + 1}`, 48),
+          subheadline: limitText(scene.subheadline || "", 76),
+          instruction,
+          visual_action: visualAction,
+          camera_direction: compactText(scene.camera_direction, planoCamera),
+          on_screen_text: limitText(scene.on_screen_text || scene.headline || "", 72),
+          voiceover: compactText(scene.voiceover, ""),
+          reference_asset_hint: compactText(scene.reference_asset_hint, "Usar a imagem mais proxima do produto."),
+          visual_fidelity: visualFidelity,
+          plano_camera: planoCamera,
+          movimento_camera: movimentoCamera,
+          ambiente,
+          iluminacao,
+          restricoes_ia: restricoesIa,
+          prompt_video_ia: compactText(scene.prompt_video_ia, buildSceneAiPrompt({
+            visualAction,
+            instruction,
+            planoCamera,
+            movimentoCamera,
+            ambiente,
+            iluminacao,
+            visualFidelity,
+            restricoesIa,
+            transition,
+          })),
+          transition_to_next: transition,
+        };
+      }),
     };
   } catch {
     return undefined;
@@ -286,12 +400,33 @@ function buildSceneTexts(input: GenerateVideoInput, productName: string, product
         scene.visual_action ? `Acao visual: ${scene.visual_action}` : "",
         scene.instruction,
         scene.camera_direction ? `Camera: ${scene.camera_direction}` : "",
+        scene.plano_camera ? `Plano 9:16: ${scene.plano_camera}` : "",
+        scene.movimento_camera ? `Movimento: ${scene.movimento_camera}` : "",
+        scene.ambiente ? `Ambiente: ${scene.ambiente}` : "",
+        scene.iluminacao ? `Iluminacao: ${scene.iluminacao}` : "",
         scene.on_screen_text ? `Texto na tela: ${scene.on_screen_text}` : "",
         scene.voiceover ? `Narracao: ${scene.voiceover}` : "",
         scene.reference_asset_hint ? `Referencia visual: ${scene.reference_asset_hint}` : "",
+        scene.visual_fidelity ? `Fidelidade ao produto: ${scene.visual_fidelity}` : "",
+        scene.restricoes_ia ? `Restricoes IA: ${scene.restricoes_ia}` : "",
+        scene.prompt_video_ia ? `Prompt IA da cena: ${scene.prompt_video_ia}` : "",
         scene.transition_to_next ? `Transicao: ${scene.transition_to_next}` : "",
       ].filter(Boolean).join(" "),
       duration_seconds: scene.duration_seconds,
+      scene_goal: scene.scene_goal,
+      visual_action: scene.visual_action,
+      camera_direction: scene.camera_direction,
+      on_screen_text: scene.on_screen_text,
+      voiceover: scene.voiceover,
+      reference_asset_hint: scene.reference_asset_hint,
+      visual_fidelity: scene.visual_fidelity,
+      transition_to_next: scene.transition_to_next,
+      prompt_video_ia: scene.prompt_video_ia,
+      plano_camera: scene.plano_camera,
+      movimento_camera: scene.movimento_camera,
+      ambiente: scene.ambiente,
+      iluminacao: scene.iluminacao,
+      restricoes_ia: scene.restricoes_ia,
     })) as SceneTextDraft[];
   }
 
@@ -370,6 +505,14 @@ function buildScenePlan(renderPlan: VideoRenderPlan, mediaTitles: string[]) {
         `Cena ${scene.order}: ${scene.headline}.`,
         scene.subheadline ? `Subtexto: ${scene.subheadline}.` : "",
         scene.instruction ? `Direção: ${scene.instruction}` : "",
+        scene.prompt_video_ia ? `Prompt final da cena para IA: ${scene.prompt_video_ia}` : "",
+        scene.plano_camera ? `Plano de camera: ${scene.plano_camera}.` : "",
+        scene.movimento_camera ? `Movimento de camera: ${scene.movimento_camera}.` : "",
+        scene.ambiente ? `Ambiente: ${scene.ambiente}.` : "",
+        scene.iluminacao ? `Iluminacao: ${scene.iluminacao}.` : "",
+        scene.visual_fidelity ? `Fidelidade visual: ${scene.visual_fidelity}.` : "",
+        scene.restricoes_ia ? `Restricoes IA: ${scene.restricoes_ia}.` : "",
+        "Fidelidade obrigatoria: preservar o produto real das imagens do usuario, mantendo cor, formato, proporcao, textura, embalagem, acessorios, tela, controle, logo aparente e detalhes fisicos. Nao substituir por produto parecido ou generico.",
         "Manter o mesmo produto, iluminação, cenário e identidade visual do início ao fim.",
       ].filter(Boolean).join(" "),
     })),

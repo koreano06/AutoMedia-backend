@@ -11,6 +11,20 @@ export type VideoRenderScene = {
   headline: string;
   subheadline?: string;
   instruction?: string;
+  scene_goal?: string;
+  visual_action?: string;
+  camera_direction?: string;
+  on_screen_text?: string;
+  voiceover?: string;
+  reference_asset_hint?: string;
+  visual_fidelity?: string;
+  transition_to_next?: string;
+  prompt_video_ia?: string;
+  plano_camera?: string;
+  movimento_camera?: string;
+  ambiente?: string;
+  iluminacao?: string;
+  restricoes_ia?: string;
 };
 
 export type VideoRenderPlan = {
