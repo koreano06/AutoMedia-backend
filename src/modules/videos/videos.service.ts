@@ -168,12 +168,13 @@ function buildVideoCreativeInstructions() {
   return systemInstructions.join(" ");
 }
 
-function buildVideoPrompt(input: GenerateVideoInput, productName: string, productDescription?: string, mediaTitles: string[] = []) {
+function buildVideoPrompt(input: GenerateVideoInput, productName: string, productDescription?: string, mediaTitles: string[] = [], productCategory?: string) {
   const briefing = input.briefing_fields || {};
   const template = input.template || input.style || "product";
   const platforms = input.platforms?.length ? input.platforms.join(", ") : input.platform || "instagram";
   const durationSeconds = secondsFromDuration(input.duration);
   const sceneCount = Math.min(6, Math.max(4, Math.ceil(durationSeconds / 5)));
+  const visualContext = buildProductVisualContext(productName, productDescription, productCategory, String(template));
   const templateGuide: Record<string, string> = {
     unboxing:
       "Criar narrativa de descoberta: caixa ou embalagem em cena somente se existir nas imagens/briefing, maos abrindo ou revelando o produto, close em detalhes reais, demonstracao curta de uso e CTA natural. Nao inventar acessorios ou embalagem nao declarados.",
@@ -201,6 +202,7 @@ function buildVideoPrompt(input: GenerateVideoInput, productName: string, produc
     "Dados do anuncio:",
     `- Produto/anuncio: ${productName}`,
     `- Descricao cadastrada: ${productDescription || "Nao informada"}`,
+    `- Categoria/contexto declarado: ${productCategory || "Nao informado"}`,
     `- Template escolhido: ${template}`,
     `- Regra do template: ${templateGuide[String(template).toLowerCase()] || templateGuide.product}`,
     `- Formato: ${input.format || "reels"}`,
@@ -221,6 +223,16 @@ function buildVideoPrompt(input: GenerateVideoInput, productName: string, produc
     `- Dor ou curiosidade inicial: ${briefing.painPoint || "mostrar por que o produto merece atencao nos primeiros segundos"}`,
     `- Objeção que o video deve reduzir: ${briefing.objection || "deixar claro como o produto e usado e qual valor ele entrega"}`,
     "",
+    "Contexto visual obrigatório para este produto:",
+    `- Tipo visual inferido: ${visualContext.contextName}`,
+    `- Uso real esperado: ${visualContext.realUse}`,
+    `- Fundo recomendado: ${visualContext.background}`,
+    `- Ambiente recomendado: ${visualContext.environment}`,
+    `- Props permitidos: ${visualContext.props}`,
+    `- Presenca humana permitida: ${visualContext.humanPresence}`,
+    `- O video precisa mostrar: ${visualContext.mustShow}`,
+    `- Evitar obrigatoriamente: ${visualContext.avoid}`,
+    "",
     "Materiais visuais disponiveis:",
     `- Midias selecionadas: ${mediaTitles.length ? mediaTitles.join(" | ") : "imagem principal do anuncio ou imagem enviada pelo usuario"}`,
     "- Regra de fidelidade visual: as imagens do usuario sao referencia obrigatoria de identidade do produto. O gerador de video deve preservar aparencia, cor, proporcao, textura, embalagem, acessorios, controle, tela, botoes, logo aparente e qualquer detalhe visivel. Nao substituir por produto parecido ou versao generica.",
@@ -235,6 +247,9 @@ function buildVideoPrompt(input: GenerateVideoInput, productName: string, produc
     "- Cada cena deve conter plano_camera, movimento_camera, ambiente, iluminacao, restricoes_ia e prompt_video_ia. O prompt_video_ia deve ser pronto para ser enviado ao gerador de video sem depender de contexto externo.",
     "- Todas as cenas devem ser pensadas para video vertical 9:16: produto central, area de texto segura, pouco texto, leitura rapida e composicao limpa.",
     "- A cena deve ser executavel por IA sem ambiguidade: descreva sujeito, acao, plano, movimento, ambiente, iluminacao, continuidade e restricoes visuais.",
+    "- O fundo de cada cena deve nascer do contexto visual recomendado. Nao use fundo aleatorio, vazio sem intencao, estudio generico ou cenario que nao combine com o uso real do produto.",
+    "- Toda cena deve conter um detalhe real do produto ou uma acao realista com o produto. Se nao houver dado suficiente, use close, macro, mao segurando, produto em superficie coerente ou demonstracao neutra sem inventar caracteristicas.",
+    "- Em prompt_video_ia, inclua explicitamente: produto fiel a imagem, ambiente recomendado, fundo, superficie de apoio, props permitidos, acao principal, movimento de camera, luz e o que nao pode aparecer.",
     "- O video deve parecer uma unica historia curta, nao uma lista de takes desconectados.",
     "- Se o template for unboxing/review, use linguagem de vendedor demonstrando o produto de forma natural.",
     "- Se o video tiver 15 a 20 segundos, prefira 4 ou 5 cenas de 3 a 5 segundos com conexao clara entre elas.",
@@ -257,6 +272,92 @@ function limitText(value: string, maxLength: number) {
 
 function firstSentence(value?: string) {
   return compactText(value).split(/[.!?]/)[0] || "";
+}
+
+function includesAny(text: string, words: string[]) {
+  return words.some((word) => text.includes(word));
+}
+
+function buildProductVisualContext(productName: string, productDescription?: string, category?: string, template?: string) {
+  const text = `${productName} ${productDescription || ""} ${category || ""} ${template || ""}`.toLowerCase();
+
+  const defaultContext = {
+    contextName: "produto de consumo",
+    realUse: "mostrar o produto em uma situacao real de uso, com a acao principal acontecendo na frente da camera",
+    background: "fundo limpo, superficie neutra e poucos elementos, sempre relacionados ao uso do produto",
+    environment: "ambiente domestico ou pequeno estudio de produto, realista, organizado e sem poluicao visual",
+    props: "usar somente props que facam sentido para demonstrar escala, uso ou beneficio; nao adicionar acessorios nao declarados",
+    humanPresence: "maos humanas podem aparecer apenas para segurar, abrir, conectar, apontar ou demonstrar uma acao simples",
+    mustShow: "produto centralizado em 9:16, close em detalhe fisico reconhecivel, uma acao de uso e resultado visual simples",
+    avoid: "nao criar cenario fantasioso, showroom generico, embalagem falsa, textos pequenos, multidoes, maos deformadas, objetos aleatorios ou produto diferente das referencias",
+  };
+
+  if (includesAny(text, ["projetor", "camera", "fone", "smart", "usb", "notebook", "eletron", "controle", "luz", "led", "carregador", "microfone"])) {
+    return {
+      contextName: "eletronico compacto",
+      realUse: "mostrar o produto sendo retirado da caixa ou posicionado em uma mesa, depois ligado/conectado ou usado com controle, cabo, botao ou tela visivel",
+      background: "mesa de setup, sala escurecida, parede limpa para projecao ou bancada tech com poucos objetos desfocados ao fundo",
+      environment: "ambiente interno realista com luz cinematografica suave, fundo escuro controlado e destaque no brilho/lente/display quando existir",
+      props: "usar somente cabo, controle remoto, caixa, suporte, celular, notebook ou superficie de apoio se fizerem sentido e estiverem coerentes com as imagens",
+      humanPresence: "maos podem abrir embalagem, segurar controle, apertar botao, conectar cabo ou ajustar posicao; evitar dedos extras e gestos complexos",
+      mustShow: "corpo real do produto, lente/tela/botoes/conectores quando visiveis, escala na mao ou mesa e uma demonstracao pratica de funcionamento",
+      avoid: "nao inventar interface, marca, resolucao, aplicativos, tela falsa, controle diferente, acessorios inexistentes ou ambiente futurista",
+    };
+  }
+
+  if (includesAny(text, ["panela", "cozinha", "liquidificador", "air fryer", "cafeteira", "garrafa", "termica", "utensilio", "cook"])) {
+    return {
+      contextName: "casa e cozinha",
+      realUse: "mostrar o produto em bancada de cozinha, sendo aberto, preenchido, segurado ou usado em uma acao simples e segura",
+      background: "bancada limpa de cozinha, pano neutro, ingredientes simples ou copo/prato apenas quando fizerem sentido",
+      environment: "cozinha realista com luz natural lateral ou luz difusa de estudio, fundo desfocado e superficie organizada",
+      props: "usar poucos utensilios, ingredientes ou recipientes coerentes com a funcao; nao inventar receitas, capacidade ou desempenho",
+      humanPresence: "maos podem abrir tampa, encaixar peca, servir, posicionar ou apontar detalhe fisico; sem acoes perigosas ou complexas",
+      mustShow: "material, tampa, alca, bico, botoes, escala de tamanho e uma acao concreta de uso",
+      avoid: "nao inventar temperatura, tempo de preparo, litros, certificacoes, receitas milagrosas ou resultados nao demonstraveis",
+    };
+  }
+
+  if (includesAny(text, ["bolsa", "mochila", "organizador", "mala", "carteira", "necessaire", "viagem"])) {
+    return {
+      contextName: "organizacao e viagem",
+      realUse: "mostrar abertura, compartimentos, itens sendo organizados e o produto pronto para transporte",
+      background: "mesa limpa, cama arrumada, mala aberta ou bancada de viagem com poucos itens do dia a dia",
+      environment: "ambiente domestico realista com luz natural suave, fundo neutro e sensacao de organizacao",
+      props: "usar roupas dobradas, cabos, documentos, cosmeticos ou pequenos objetos apenas para demonstrar compartimentos",
+      humanPresence: "maos podem abrir ziper, inserir item, fechar compartimento e levantar o produto para mostrar escala",
+      mustShow: "tamanho relativo, abertura, compartimentos, textura, costura, fechamento e organizacao final",
+      avoid: "nao inventar quantidade exata de itens, resistencia, impermeabilidade ou capacidade se nao estiver declarada",
+    };
+  }
+
+  if (includesAny(text, ["roupa", "camisa", "calca", "vestido", "tenis", "sapato", "moda", "relogio", "oculos"])) {
+    return {
+      contextName: "moda e acessorio",
+      realUse: "mostrar o produto em corpo, mao, cabide ou superficie, com detalhe de textura e uma cena de uso real",
+      background: "closet, espelho, parede neutra ou fundo urbano discreto, sem competir com o produto",
+      environment: "ambiente limpo com luz natural ou luz de estudio suave, cor fiel ao tecido/material e movimento natural",
+      props: "usar poucos elementos de composicao, como cabide, mesa, caixa ou roupa complementar neutra",
+      humanPresence: "pessoa ou maos podem vestir, ajustar, girar ou apontar detalhe; evitar poses exageradas e partes deformadas",
+      mustShow: "caimento, textura, cor real, acabamento, fecho/solado/lente e escala no corpo ou mao",
+      avoid: "nao inventar tamanho, tecido premium, resistencia, marca, composicao ou transformacao corporal",
+    };
+  }
+
+  if (includesAny(text, ["creme", "perfume", "maquiagem", "skin", "beleza", "barba", "cabelo", "cosmetico"])) {
+    return {
+      contextName: "beleza e cuidado pessoal",
+      realUse: "mostrar embalagem, textura/aplicacao quando segura e uma rotina simples em bancada ou banheiro organizado",
+      background: "bancada limpa, espelho desfocado, toalha neutra ou fundo de skincare minimalista",
+      environment: "luz difusa suave, tons limpos, reflexos controlados e foco em embalagem/textura",
+      props: "usar apenas toalha, espelho, aplicador ou pequenos itens de cuidado coerentes com o produto",
+      humanPresence: "maos podem abrir tampa, aplicar pequena quantidade ou segurar embalagem; evitar pele irreal ou resultado clinico",
+      mustShow: "embalagem real, rotulo visivel se existir, textura, tampa, aplicador e gesto simples de uso",
+      avoid: "nao prometer resultado medico, antes/depois milagroso, rejuvenescimento, cura, clareamento ou efeito nao comprovado",
+    };
+  }
+
+  return defaultContext;
 }
 
 function secondsFromDuration(duration?: string | number) {
@@ -287,9 +388,12 @@ function buildSceneAiPrompt(input: {
   visualFidelity?: string;
   restricoesIa?: string;
   transition?: string;
+  visualContext?: ReturnType<typeof buildProductVisualContext>;
 }) {
+  const context = input.visualContext;
   return compactText([
     `Video vertical 9:16 de demonstracao realista do produto ${input.productName || "do anuncio"}.`,
+    context ? `Contexto real de uso: ${context.realUse}. Fundo recomendado: ${context.background}. Ambiente recomendado: ${context.environment}. Props permitidos: ${context.props}.` : "",
     input.visualAction,
     input.instruction,
     input.planoCamera ? `Enquadramento: ${input.planoCamera}.` : "",
@@ -299,6 +403,8 @@ function buildSceneAiPrompt(input: {
     input.visualFidelity ? `Fidelidade visual obrigatoria: ${input.visualFidelity}.` : "",
     input.restricoesIa ? `Restricoes: ${input.restricoesIa}.` : "",
     input.transition ? `Finalizar com ${input.transition}.` : "",
+    context ? `Mostrar obrigatoriamente: ${context.mustShow}. Evitar: ${context.avoid}.` : "",
+    "Nao usar fundo aleatorio, cenario generico sem relacao com o produto ou objetos que nao tenham funcao na demonstracao.",
   ].filter(Boolean).join(" "));
 }
 
@@ -389,7 +495,8 @@ function buildScriptFromCreativePlan(plan?: AIVideoCreativePlan) {
   ].filter(Boolean).join("\n");
 }
 
-function buildSceneTexts(input: GenerateVideoInput, productName: string, productDescription?: string, creativePlan?: AIVideoCreativePlan) {
+function buildSceneTexts(input: GenerateVideoInput, productName: string, productDescription?: string, creativePlan?: AIVideoCreativePlan, productCategory?: string) {
+  const visualContext = buildProductVisualContext(productName, productDescription, productCategory, input.template || input.style);
   if (creativePlan?.scenes?.length) {
     return creativePlan.scenes.map((scene) => ({
       type: scene.type,
@@ -424,9 +531,9 @@ function buildSceneTexts(input: GenerateVideoInput, productName: string, product
       prompt_video_ia: scene.prompt_video_ia,
       plano_camera: scene.plano_camera,
       movimento_camera: scene.movimento_camera,
-      ambiente: scene.ambiente,
-      iluminacao: scene.iluminacao,
-      restricoes_ia: scene.restricoes_ia,
+      ambiente: scene.ambiente || visualContext.environment,
+      iluminacao: scene.iluminacao || "Luz realista coerente com o ambiente, produto bem separado do fundo e sem reflexos confusos.",
+      restricoes_ia: scene.restricoes_ia || visualContext.avoid,
     })) as SceneTextDraft[];
   }
 
@@ -434,31 +541,132 @@ function buildSceneTexts(input: GenerateVideoInput, productName: string, product
   const benefit = briefing.promise || firstSentence(productDescription) || "Mais praticidade no dia a dia";
   const target = briefing.targetAudience || "sua rotina";
   const cta = briefing.cta || "Comente EU QUERO";
+  const fidelity = `Preservar exatamente aparencia, cor, formato, proporcao, textura e detalhes visiveis do ${productName}. Nao substituir por produto parecido.`;
 
   return [
     {
       type: "hook",
       headline: limitText(`Olha esse ${productName}`, 46),
       subheadline: limitText(briefing.objective || "Criativo pronto para chamar atenção", 64),
-      instruction: "Abrir com movimento leve, texto grande e leitura rápida.",
+      instruction: `Abrir com close real do produto em ${visualContext.background}, mostrando um detalhe reconhecivel antes de revelar a cena completa.`,
+      scene_goal: "Prender a atencao nos primeiros segundos usando detalhe real do produto.",
+      visual_action: `Produto aparece em close ou nas maos, com acao simples coerente: ${visualContext.realUse}.`,
+      camera_direction: "Close vertical 9:16 com produto ocupando a area central segura.",
+      on_screen_text: limitText(`${productName}: veja antes de comprar`, 46),
+      voiceover: limitText(`Veja como esse ${productName} funciona na pratica.`, 70),
+      visual_fidelity: fidelity,
+      plano_camera: "Close ou macro do produto, mantendo bordas e detalhes importantes dentro do quadro vertical.",
+      movimento_camera: "Push-in suave ou pequeno movimento lateral, sem cortes bruscos.",
+      ambiente: visualContext.environment,
+      iluminacao: "Luz suave direcionada ao produto, fundo levemente desfocado e sem excesso de brilho.",
+      restricoes_ia: visualContext.avoid,
+      transition_to_next: "CORTE POR MOVIMENTO para revelar o produto em uso real.",
+      prompt_video_ia: buildSceneAiPrompt({
+        productName,
+        visualAction: `Mostrar detalhe real do ${productName} em close.`,
+        instruction: "Gancho visual curto, sem inventar texto tecnico ou acessorio.",
+        planoCamera: "Close vertical 9:16.",
+        movimentoCamera: "Push-in suave.",
+        ambiente: visualContext.environment,
+        iluminacao: "Luz suave e realista.",
+        visualFidelity: fidelity,
+        restricoesIa: visualContext.avoid,
+        transition: "corte por movimento",
+        visualContext,
+      }),
     },
     {
       type: "benefit",
       headline: limitText(benefit, 48),
       subheadline: limitText(`Ideal para ${target}`, 64),
-      instruction: "Destacar o principal benefício com zoom no produto.",
+      instruction: `Demonstrar o beneficio principal em uma situacao real: ${visualContext.realUse}. O produto precisa estar claramente identificavel.`,
+      scene_goal: "Mostrar o valor pratico do produto sem exagero.",
+      visual_action: `Maos ou suporte demonstram uma acao simples com o ${productName}, usando apenas props permitidos.`,
+      camera_direction: "Plano medio vertical com produto e acao visiveis.",
+      on_screen_text: limitText(benefit, 46),
+      voiceover: limitText(`O ponto forte aqui e: ${benefit}.`, 70),
+      visual_fidelity: fidelity,
+      plano_camera: "Plano medio 9:16, produto central, acao de uso ocupando o centro do quadro.",
+      movimento_camera: "Pan curto acompanhando a acao principal.",
+      ambiente: visualContext.environment,
+      iluminacao: "Luz consistente com a cena anterior, produto com contorno claro.",
+      restricoes_ia: visualContext.avoid,
+      transition_to_next: "MATCH CUT para detalhe/prova visual do produto.",
+      prompt_video_ia: buildSceneAiPrompt({
+        productName,
+        visualAction: `Demonstrar uso real do ${productName}.`,
+        instruction: `Evidenciar o beneficio sem prometer resultado nao declarado: ${benefit}.`,
+        planoCamera: "Plano medio vertical 9:16.",
+        movimentoCamera: "Pan curto seguindo a acao.",
+        ambiente: visualContext.environment,
+        iluminacao: "Luz realista consistente.",
+        visualFidelity: fidelity,
+        restricoesIa: visualContext.avoid,
+        transition: "match cut",
+        visualContext,
+      }),
     },
     {
       type: "proof",
-      headline: limitText("Visual de anúncio pronto", 42),
+      headline: limitText("Detalhe que faz diferença", 42),
       subheadline: limitText(briefing.tone || "Mensagem direta, natural e sem exagero", 64),
-      instruction: "Reforçar confiança e clareza antes do CTA.",
+      instruction: `Mostrar detalhe fisico, textura, acabamento, botao, tela, compartimento ou parte visivel real do ${productName}, conforme a imagem de referencia.`,
+      scene_goal: "Reduzir duvida mostrando prova visual concreta.",
+      visual_action: "Aproximar em um detalhe real do produto e manter a identidade visual intacta.",
+      camera_direction: "Macro/close vertical com foco no detalhe fisico.",
+      on_screen_text: "Detalhe real, sem enrolação",
+      voiceover: "Repare nos detalhes antes de decidir.",
+      visual_fidelity: fidelity,
+      plano_camera: "Macro ou close com foco seletivo, sem cortar partes essenciais.",
+      movimento_camera: "Rack focus leve ou zoom lento para destacar o detalhe.",
+      ambiente: visualContext.environment,
+      iluminacao: "Luz controlada para textura e bordas ficarem legiveis.",
+      restricoes_ia: visualContext.avoid,
+      transition_to_next: "ZOOM OUT DE TRANSICAO para fechar com produto completo.",
+      prompt_video_ia: buildSceneAiPrompt({
+        productName,
+        visualAction: "Mostrar detalhe real e reconhecivel do produto.",
+        instruction: "Usar a imagem do usuario como identidade obrigatoria; nao criar peca, botao ou acabamento inexistente.",
+        planoCamera: "Macro vertical 9:16.",
+        movimentoCamera: "Rack focus ou zoom lento.",
+        ambiente: visualContext.environment,
+        iluminacao: "Luz controlada para detalhes.",
+        visualFidelity: fidelity,
+        restricoesIa: visualContext.avoid,
+        transition: "zoom out",
+        visualContext,
+      }),
     },
     {
       type: "cta",
       headline: limitText(cta, 42),
       subheadline: limitText("Receba o link e veja os detalhes", 64),
-      instruction: "Fechar com chamada forte e barra visual completa.",
+      instruction: `Fechar com beauty shot do ${productName} no mesmo contexto real, CTA claro e produto ainda fiel as imagens enviadas.`,
+      scene_goal: "Encerrar com acao simples e produto memoravel.",
+      visual_action: "Produto completo em cena, fundo limpo, movimento suave e CTA legivel.",
+      camera_direction: "Plano aberto vertical com produto centralizado e espaco seguro para texto.",
+      on_screen_text: limitText(cta, 42),
+      voiceover: limitText(`${cta} para receber o link.`, 70),
+      visual_fidelity: fidelity,
+      plano_camera: "Plano aberto 9:16, produto central e texto em area segura.",
+      movimento_camera: "Zoom out suave ou camera fixa premium.",
+      ambiente: visualContext.environment,
+      iluminacao: "Luz final limpa, contraste suficiente para leitura do CTA.",
+      restricoes_ia: visualContext.avoid,
+      transition_to_next: "FADE final curto, sem cortar o produto.",
+      prompt_video_ia: buildSceneAiPrompt({
+        productName,
+        visualAction: "Beauty shot final com CTA.",
+        instruction: "Produto completo e reconhecivel, texto simples, sem elementos aleatorios.",
+        planoCamera: "Plano aberto vertical 9:16.",
+        movimentoCamera: "Zoom out suave.",
+        ambiente: visualContext.environment,
+        iluminacao: "Luz final limpa.",
+        visualFidelity: fidelity,
+        restricoesIa: visualContext.avoid,
+        transition: "fade final",
+        visualContext,
+      }),
     },
   ] as SceneTextDraft[];
 }
@@ -470,10 +678,11 @@ function buildRenderPlan(
   productName: string,
   productDescription?: string,
   creativePlan?: AIVideoCreativePlan,
+  productCategory?: string,
 ): VideoRenderPlan {
   const totalSeconds = secondsFromDuration(input.duration);
   const durations = sceneDurations(totalSeconds);
-  const sceneTexts = buildSceneTexts(input, productName, productDescription, creativePlan);
+  const sceneTexts = buildSceneTexts(input, productName, productDescription, creativePlan, productCategory);
   const fallbackSource = mediaUrls[0] || "product_image";
 
   return {
@@ -606,7 +815,7 @@ export const videosService = {
     const usableMedia = selectedMedia.filter(Boolean);
     const mediaUrls = usableMedia.map((asset) => asset?.url || asset?.thumbnail_url).filter(Boolean) as string[];
     const mediaTitles = usableMedia.map((asset) => asset?.title || asset?.source || asset?.url).filter(Boolean) as string[];
-    const prompt = buildVideoPrompt(payload, product.name, product.description, mediaTitles);
+    const prompt = buildVideoPrompt(payload, product.name, product.description, mediaTitles, product.category || undefined);
     const aiResult = payload.script
       ? { text: payload.script, provider: "provided-script" }
       : await aiService.generateText(prompt, {
@@ -623,7 +832,7 @@ export const videosService = {
     const rawRenderMediaUrls = [...mediaUrls, productImageUrl].filter(Boolean);
     const mediaCache = await cacheRenderMediaUrls(rawRenderMediaUrls, workspaceId || product.workspace_id, product.id);
     const renderMediaUrls = mediaCache.urls;
-    const renderPlan = buildRenderPlan(payload, renderMediaUrls, script, product.name, product.description, creativePlan);
+    const renderPlan = buildRenderPlan(payload, renderMediaUrls, script, product.name, product.description, creativePlan, product.category || undefined);
     const scenePlan = buildScenePlan(renderPlan, mediaTitles);
     const costEstimate = estimateVideoCost(payload.duration);
     const platforms = payload.platforms?.length ? payload.platforms : payload.platform ? [payload.platform] : [];

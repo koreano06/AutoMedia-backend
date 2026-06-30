@@ -85,8 +85,11 @@ function buildPrompt(input: AIVideoInput) {
     "Motion: slow push-in, handheld product reveal, subtle parallax, clean background, no distorted text.",
     "Composition: strict vertical 9:16, product visible in the safe area, clear readable large text only if needed, no clutter.",
     "Mandatory product fidelity: keep the exact same product from the user's reference image and platform request. Do not change model, color, shape, scale, texture, packaging, screen, remote/control, visible logo, accessories, buttons or physical details. If a detail is unclear, simplify the shot instead of inventing a different or generic product.",
+    "Reference image rule: treat the reference image as a product identity lock, not as a loose moodboard. Preserve the real product first; cinematic style is secondary.",
+    "Background/context rule: use the exact environment, background, props and lighting described by the storyboard. If missing, choose a realistic real-use setting that makes sense for this product category.",
+    "Practical demonstration rule: every shot must either reveal the product, show a real product detail, show a hand using it, or show the practical result/context of use. No disconnected lifestyle filler.",
     "Continuity: every shot must feel like part of the same short ad, with matching lighting, environment, product state and camera style.",
-    "Avoid: generic substitute products, extra accessories, invented labels, small unreadable text, deformed hands, unrelated props, fake UI screens, sudden scene jumps.",
+    "Avoid: generic substitute products, random backgrounds, abstract studios, extra accessories, invented labels, small unreadable text, deformed hands, unrelated props, fake UI screens, sudden scene jumps.",
     sceneDirections ? `Storyboard: ${sceneDirections}.` : "",
     input.prompt,
   ].filter(Boolean).join("\n");

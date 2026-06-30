@@ -90,7 +90,11 @@ function buildSegmentPrompt(input: {
   const productionRules = [
     "Vertical 9:16 production rules:",
     "Keep the product centered or intentionally framed in the vertical safe area.",
+    "Use the environment, background, props and lighting described in each scene. If the scene is missing context, infer a believable real-use setting for this exact product, not a random studio.",
+    "Every scene must show either the actual product, a real close detail, or a practical product action. Do not create lifestyle filler without the product.",
+    "Props must support the demonstration: table, hands, package, cable, remote, ingredients, bag items or support objects only when they match the product and references.",
     "Avoid tiny text, unreadable interface details, distorted hands, invented logos, fake product labels, extra accessories and unrelated props.",
+    "Do not add fake screens, fake apps, fake packaging, fake technical claims or features that were not present in the product data or reference image.",
     "Use one clear camera movement per scene and maintain continuity between shots.",
     "The video must look like a realistic product demo/unboxing ad, not an abstract animation.",
   ].join(" ");
