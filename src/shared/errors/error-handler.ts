@@ -1,6 +1,8 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import { AppError } from "./AppError.js";
+import { env } from "../../config/env.js";
 import { securityService } from "../../modules/security/security.service.js";
+import { logger } from "../utils/logger.js";
 
 export function errorHandler(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
   if (error instanceof AppError) {
@@ -24,11 +26,17 @@ export function errorHandler(error: FastifyError, request: FastifyRequest, reply
     user_agent: request.headers["user-agent"],
     metadata: { code: error.code, path: request.url, message: error.message },
   });
+  logger.error({
+    err: error,
+    path: request.url,
+    method: request.method,
+    actor_id: request.user?.id,
+  }, "unhandled_request_error");
 
   return reply.status(error.statusCode || 500).send({
     error: {
       code: error.code || "INTERNAL_ERROR",
-      message: error.message || "Erro interno",
+      message: env.NODE_ENV === "production" ? "Erro interno" : (error.message || "Erro interno"),
     },
   });
 }

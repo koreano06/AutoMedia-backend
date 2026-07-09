@@ -11,7 +11,7 @@ export async function registerCommentsRoutes(app: FastifyInstance) {
 
   app.post("/", async (request, reply) => created(reply, await commentsService.create(commentPayloadSchema.parse(request.body), request.user?.workspace_id)));
 
-  app.post("/auto-reply", async (request) => commentsService.autoReply(autoReplySchema.parse(request.body), request.user?.workspace_id));
+  app.post("/auto-reply", { config: { rateLimit: { max: 12, timeWindow: "1 minute" } } }, async (request) => commentsService.autoReply(autoReplySchema.parse(request.body), request.user?.workspace_id));
 
   app.patch("/:id", async (request) => {
     const { id } = request.params as { id: string };

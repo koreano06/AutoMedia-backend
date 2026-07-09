@@ -1,6 +1,7 @@
 import { env } from "../../../config/env.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import type { OAuthTokenResult, PlatformProvider, PublishPayload, PublishResult } from "./platform-provider.types.js";
+import { sanitizeExternalErrorPayload } from "../../../shared/utils/redact.js";
 
 export function buildUrl(baseUrl: string, params: Record<string, string | number | undefined>) {
   const url = new URL(baseUrl);
@@ -56,7 +57,7 @@ export async function postForm<T>(url: string, body: Record<string, string | und
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new AppError(`Falha OAuth: ${JSON.stringify(payload)}`, response.status, "OAUTH_EXCHANGE_FAILED");
+    throw new AppError(`Falha OAuth: ${sanitizeExternalErrorPayload(payload)}`, response.status, "OAUTH_EXCHANGE_FAILED");
   }
 
   return payload as T;
@@ -93,7 +94,7 @@ export async function getJson<T>(url: string, accessToken?: string) {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new AppError(`Falha na API externa: ${JSON.stringify(payload)}`, response.status, "EXTERNAL_API_ERROR");
+    throw new AppError(`Falha na API externa: ${sanitizeExternalErrorPayload(payload)}`, response.status, "EXTERNAL_API_ERROR");
   }
 
   return payload as T;
@@ -111,7 +112,7 @@ export async function postJson<T>(url: string, body: unknown, accessToken?: stri
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new AppError(`Falha na API externa: ${JSON.stringify(payload)}`, response.status, "EXTERNAL_API_ERROR");
+    throw new AppError(`Falha na API externa: ${sanitizeExternalErrorPayload(payload)}`, response.status, "EXTERNAL_API_ERROR");
   }
 
   return payload as T;
@@ -130,7 +131,7 @@ export async function postGraphForm<T>(url: string, body: Record<string, string 
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new AppError(`Falha na API externa: ${JSON.stringify(payload)}`, response.status, "EXTERNAL_API_ERROR");
+    throw new AppError(`Falha na API externa: ${sanitizeExternalErrorPayload(payload)}`, response.status, "EXTERNAL_API_ERROR");
   }
 
   return payload as T;

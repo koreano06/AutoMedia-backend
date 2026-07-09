@@ -52,7 +52,7 @@ const envSchema = z.object({
   REPLICATE_API_TOKEN: z.string().optional(),
   REPLICATE_KLING_MODEL: z.string().default("kwaivgi/kling-v2.1"),
   REPLICATE_KLING_MODE: z.enum(["standard", "pro"]).default("standard"),
-  REPLICATE_KLING_NEGATIVE_PROMPT: z.string().default("low quality, distorted product, unreadable text, extra fingers, deformed hands, watermark, logo distortion"),
+  REPLICATE_KLING_NEGATIVE_PROMPT: z.string().default("low quality, distorted product, generic product, different model, wrong color, changed shape, changed proportions, unreadable text, extra fingers, deformed hands, watermark, logo distortion, invented logo, fake label, wrong packaging, unrelated props, inconsistent product between shots"),
   REPLICATE_POLL_INTERVAL_MS: z.coerce.number().default(5000),
   REPLICATE_TIMEOUT_MS: z.coerce.number().default(420000),
   AI_VIDEO_SEGMENT_ESTIMATED_COST_USD: z.coerce.number().min(0).default(0),
@@ -72,6 +72,30 @@ const envSchema = z.object({
   SUPABASE_STORAGE_BUCKET: z.string().default("videos"),
   VIDEO_RENDER_DRIVER: z.enum(["ffmpeg", "mock"]).default("ffmpeg"),
   FFMPEG_PATH: z.string().default("ffmpeg"),
+}).superRefine((value, context) => {
+  if (value.NODE_ENV === "production" && value.JWT_SECRET.length < 32) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["JWT_SECRET"],
+      message: "JWT_SECRET precisa ter pelo menos 32 caracteres em producao.",
+    });
+  }
+
+  if (value.NODE_ENV === "production" && value.JWT_SECRET === "change-me-in-production") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["JWT_SECRET"],
+      message: "JWT_SECRET padrao nao pode ser usado em producao.",
+    });
+  }
+
+  if (value.NODE_ENV === "production" && (!value.ENCRYPTION_KEY || value.ENCRYPTION_KEY.length < 32)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["ENCRYPTION_KEY"],
+      message: "ENCRYPTION_KEY precisa ter pelo menos 32 caracteres em producao.",
+    });
+  }
 });
 
 export const env = envSchema.parse(process.env);

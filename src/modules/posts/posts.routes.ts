@@ -12,13 +12,13 @@ export async function registerPostsRoutes(app: FastifyInstance) {
 
   app.post("/", async (request, reply) => created(reply, await postsService.create(postPayloadSchema.parse(request.body), request.user?.workspace_id, request.user?.id)));
 
-  app.post("/schedule", async (request, reply) => created(reply, await postsService.schedule(schedulePostSchema.parse(request.body), request.user?.workspace_id, request.user?.id)));
+  app.post("/schedule", { config: { rateLimit: { max: 8, timeWindow: "1 minute" } } }, async (request, reply) => created(reply, await postsService.schedule(schedulePostSchema.parse(request.body), request.user?.workspace_id, request.user?.id)));
 
-  app.post("/publish-due", { preHandler: requireRole(["admin"]) }, async (request) => {
+  app.post("/publish-due", { preHandler: requireRole(["admin"]), config: { rateLimit: { max: 4, timeWindow: "1 minute" } } }, async (request) => {
     return postsService.publishDue(publishDuePostsSchema.parse(request.body || {}), request.user?.workspace_id);
   });
 
-  app.post("/:id/publish-now", { preHandler: requireRole(["admin"]) }, async (request) => {
+  app.post("/:id/publish-now", { preHandler: requireRole(["admin"]), config: { rateLimit: { max: 6, timeWindow: "1 minute" } } }, async (request) => {
     const { id } = request.params as { id: string };
     return postsService.publishNow(id, request.user?.workspace_id, request.user?.id);
   });

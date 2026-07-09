@@ -7,6 +7,7 @@ import { AppError } from "../../shared/errors/AppError.js";
 import { authRepository } from "./auth.repository.js";
 import { auditService } from "../audit/audit.service.js";
 import { securityService } from "../security/security.service.js";
+import { requireWorkspaceId } from "../../shared/utils/workspace.js";
 
 type AuthJwtPayload = {
   sub: string;
@@ -14,10 +15,8 @@ type AuthJwtPayload = {
   workspace_id?: string;
 };
 
-const DEFAULT_WORKSPACE_ID = "workspace_automedia";
-
 function resolveWorkspaceId(workspaceId?: string | null) {
-  return workspaceId || DEFAULT_WORKSPACE_ID;
+  return requireWorkspaceId(workspaceId);
 }
 
 function publicUser(user: { id: string; name: string; username: string; role: string; workspaceId?: string | null; storeName?: string | null; createdAt?: Date }) {

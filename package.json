@@ -29,6 +29,7 @@
     "vm:install-timers": "node scripts/install-vm-timers.mjs",
     "secrets:rotate:checklist": "node scripts/rotate-secrets-checklist.mjs",
     "git:safety": "node scripts/check-git-safety.mjs",
+    "git:history:safety": "node scripts/check-git-history-safety.mjs",
     "check:errors": "node scripts/report-errors-only.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"

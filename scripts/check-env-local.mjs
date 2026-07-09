@@ -71,6 +71,10 @@ if ((process.env.ENCRYPTION_KEY || "").length < 32) {
   errors.push("ENCRYPTION_KEY precisa ter pelo menos 32 caracteres.");
 }
 
+if ((process.env.JWT_SECRET || "") === "change-me-in-production") {
+  errors.push("JWT_SECRET ainda esta no valor padrao inseguro.");
+}
+
 if ((process.env.CORS_ORIGIN || "").includes("*")) {
   errors.push("CORS_ORIGIN nao deve usar *.");
 }

@@ -23,6 +23,7 @@ try {
     prisma.post.updateMany({ where: { workspaceId: null }, data: { workspaceId: workspace.id } }),
     prisma.comment.updateMany({ where: { workspaceId: null }, data: { workspaceId: workspace.id } }),
     prisma.job.updateMany({ where: { workspaceId: null }, data: { workspaceId: workspace.id } }),
+    prisma.platformAccount.updateMany({ where: { workspaceId: null }, data: { workspaceId: workspace.id } }),
     prisma.salesOrder.updateMany({ where: { workspaceId: null }, data: { workspaceId: workspace.id } }),
     prisma.expense.updateMany({ where: { workspaceId: null }, data: { workspaceId: workspace.id } }),
     prisma.marketplaceListing.updateMany({ where: { workspaceId: null }, data: { workspaceId: workspace.id } }),

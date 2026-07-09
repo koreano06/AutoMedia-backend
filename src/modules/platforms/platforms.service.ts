@@ -7,20 +7,15 @@ import { ensureConfigured } from "./providers/provider-utils.js";
 import type { PlatformAccount } from "../../shared/types/domain.js";
 import type { PublishPayload } from "./providers/platform-provider.types.js";
 import { auditService } from "../audit/audit.service.js";
+import { createSignedOAuthState, parseSignedOAuthState } from "../../shared/utils/oauth-state.js";
+import { requireWorkspaceId } from "../../shared/utils/workspace.js";
 
 function encodeState(platform: string, workspaceId?: string) {
-  return Buffer.from(JSON.stringify({ platform, workspace_id: workspaceId, created_at: Date.now() })).toString("base64url");
+  return createSignedOAuthState({ platform, workspace_id: requireWorkspaceId(workspaceId) });
 }
 
 function decodeState(state?: string) {
-  if (!state) return {};
-
-  try {
-    const parsed = JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
-    return parsed && typeof parsed === "object" ? parsed as { workspace_id?: string } : {};
-  } catch {
-    return {};
-  }
+  return parseSignedOAuthState(state);
 }
 
 function expiresAt(expiresIn?: number) {
@@ -89,12 +84,13 @@ function decorateAccount(account: PlatformAccount) {
 
 export const platformsService = {
   async listAccounts(workspaceId?: string) {
-    const accounts: PlatformAccount[] = await platformsRepository.listAccounts(workspaceId);
+    const accounts: PlatformAccount[] = await platformsRepository.listAccounts(requireWorkspaceId(workspaceId));
     return accounts.map(decorateAccount);
   },
 
   async connect(platform: string, workspaceId?: string) {
-    const account = await platformsRepository.findByPlatform(platform, workspaceId);
+    const resolvedWorkspaceId = requireWorkspaceId(workspaceId);
+    const account = await platformsRepository.findByPlatform(platform, resolvedWorkspaceId);
     const provider = getPlatformProvider(platform);
     if (!account || !provider) throw new AppError("Plataforma não suportada", 404, "PLATFORM_NOT_FOUND");
 
@@ -107,7 +103,7 @@ export const platformsService = {
         scopes: provider.requiredScopes,
       };
       const connected = await platformsRepository.updateAccount(platform, {
-        workspace_id: workspaceId,
+        workspace_id: resolvedWorkspaceId,
         status: "connected",
         access_token: token.access_token,
         refresh_token: token.refresh_token,
@@ -115,7 +111,7 @@ export const platformsService = {
         scopes: token.scopes,
         expires_at: expiresAt(token.expires_in),
         account_name: account.account_name,
-        metadata: { mode: "mock", ...(workspaceId ? { workspace_id: workspaceId } : {}) },
+        metadata: { mode: "mock", workspace_id: resolvedWorkspaceId },
       });
       await auditService.log({ action: "platform.connect.mock", entity_type: "platform_account", entity_id: connected.id, metadata: { platform } });
 
@@ -130,7 +126,7 @@ export const platformsService = {
 
     return {
       account: decorateAccount(account),
-      oauth_url: provider.getAuthUrl(encodeState(platform, workspaceId)),
+      oauth_url: provider.getAuthUrl(encodeState(platform, resolvedWorkspaceId)),
       mode: "live",
     };
   },
@@ -141,7 +137,10 @@ export const platformsService = {
 
   async handleCallback(platform: string, query: { code?: string; state?: string; error?: string; error_description?: string; shop_id?: string }) {
     const state = decodeState(query.state);
-    const workspaceId = state.workspace_id;
+    const workspaceId = requireWorkspaceId(state.workspace_id);
+    if (state.platform !== platform) {
+      throw new AppError("State OAuth nao corresponde a plataforma solicitada", 400, "OAUTH_STATE_PLATFORM_MISMATCH");
+    }
 
     if (query.error) {
       await platformsRepository.updateAccount(platform, { workspace_id: workspaceId, status: "error", error_message: query.error_description || query.error });
@@ -155,26 +154,28 @@ export const platformsService = {
     if (env.SOCIAL_INTEGRATIONS_MODE === "live") ensureConfigured(provider);
 
     const token = await provider.exchangeCode(query.code, { shop_id: query.shop_id });
-    const account = await persistToken(platform, provider.requiredScopes, token, { connected_at: nowIso(), mode: env.SOCIAL_INTEGRATIONS_MODE, ...(workspaceId ? { workspace_id: workspaceId } : {}) });
+    const account = await persistToken(platform, provider.requiredScopes, token, { connected_at: nowIso(), mode: env.SOCIAL_INTEGRATIONS_MODE, workspace_id: workspaceId });
     await auditService.log({ action: "platform.connect.live", entity_type: "platform_account", entity_id: account.id, metadata: { platform } });
 
     return { account: decorateAccount(account), redirect_url: `${env.FRONTEND_URL}/integrations?platform=${platform}&connected=1` };
   },
 
   async refresh(platform: string, workspaceId?: string) {
-    const account = await platformsRepository.findByPlatform(platform, workspaceId);
+    const resolvedWorkspaceId = requireWorkspaceId(workspaceId);
+    const account = await platformsRepository.findByPlatform(platform, resolvedWorkspaceId);
     const provider = getPlatformProvider(platform);
     if (!account || !provider) throw new AppError("Plataforma não suportada", 404, "PLATFORM_NOT_FOUND");
     if (!provider.refreshToken) throw new AppError("Refresh token não suportado nesta plataforma", 400, "PLATFORM_REFRESH_UNSUPPORTED");
 
     const token = await provider.refreshToken(account);
-    const refreshed = await persistToken(platform, provider.requiredScopes, token, { refreshed_at: nowIso(), mode: env.SOCIAL_INTEGRATIONS_MODE, ...(workspaceId ? { workspace_id: workspaceId } : {}) });
+    const refreshed = await persistToken(platform, provider.requiredScopes, token, { refreshed_at: nowIso(), mode: env.SOCIAL_INTEGRATIONS_MODE, workspace_id: resolvedWorkspaceId });
     await auditService.log({ action: "platform.refresh_token", entity_type: "platform_account", entity_id: refreshed.id, metadata: { platform } });
     return decorateAccount(refreshed);
   },
 
   async syncAccount(platform: string, workspaceId?: string) {
-    const account = await platformsRepository.findByPlatform(platform, workspaceId);
+    const resolvedWorkspaceId = requireWorkspaceId(workspaceId);
+    const account = await platformsRepository.findByPlatform(platform, resolvedWorkspaceId);
     const provider = getPlatformProvider(platform);
     if (!account || !provider) throw new AppError("Plataforma não suportada", 404, "PLATFORM_NOT_FOUND");
     if (!provider.getAccountInfo) throw new AppError("Sincronização não suportada nesta plataforma", 400, "PLATFORM_SYNC_UNSUPPORTED");
@@ -204,8 +205,9 @@ export const platformsService = {
   },
 
   async disconnect(platform: string, workspaceId?: string) {
+    const resolvedWorkspaceId = requireWorkspaceId(workspaceId);
     const account = await platformsRepository.updateAccount(platform, {
-      workspace_id: workspaceId,
+      workspace_id: resolvedWorkspaceId,
       status: "disconnected",
       access_token: undefined,
       refresh_token: undefined,
@@ -220,7 +222,7 @@ export const platformsService = {
   },
 
   async publish(platform: string, payload: PublishPayload, workspaceId?: string) {
-    const account = await platformsRepository.findByPlatform(platform, workspaceId);
+    const account = await platformsRepository.findByPlatform(platform, requireWorkspaceId(workspaceId));
     const provider = getPlatformProvider(platform);
     if (!account || !provider) throw new AppError("Plataforma não suportada", 404, "PLATFORM_NOT_FOUND");
     if (account.status !== "connected" || !account.access_token) throw new AppError("Plataforma não conectada", 409, "PLATFORM_NOT_CONNECTED");

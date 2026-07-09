@@ -25,5 +25,6 @@ Regras práticas:
 - nunca use segredo real em README, docs, testes ou scripts
 - se um segredo foi exposto em commit, considere-o comprometido e rotacione antes de qualquer outra ação
 - antes de commitar, rode `npm run git:safety`
+- periodicamente rode `npm run git:history:safety` para auditar caminhos e padrões sensíveis no histórico
 
-O workflow de CI também executa `npm run git:safety` para bloquear arquivos rastreados indevidos e padrões claros de segredo.
+O workflow de CI também executa `npm run git:safety`, `npm run git:history:safety` e `gitleaks` para bloquear arquivos rastreados indevidos e padrões claros de segredo.

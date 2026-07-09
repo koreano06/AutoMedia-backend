@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { env } from "../../config/env.js";
 import { AppError } from "../errors/AppError.js";
 import { securityService } from "../../modules/security/security.service.js";
+import { requireWorkspaceId } from "../utils/workspace.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -71,7 +72,7 @@ export async function authMiddleware(request: FastifyRequest, _reply: FastifyRep
     request.user = {
       id: payload.sub,
       role: payload.role,
-      workspace_id: payload.workspace_id,
+      workspace_id: requireWorkspaceId(payload.workspace_id),
     };
   } catch (error) {
     if (error instanceof AppError) throw error;

@@ -29,10 +29,11 @@ import { registerDiagnosticsRoutes } from "./modules/diagnostics/diagnostics.rou
 import { registerActionRoutes } from "./modules/actions/actions.routes.js";
 import { authMiddleware } from "./shared/middlewares/auth.middleware.js";
 import { rateLimitOptions } from "./shared/middlewares/rate-limit.middleware.js";
+import { logger } from "./shared/utils/logger.js";
 
 export function buildApp() {
   const app = Fastify({
-    logger: env.NODE_ENV !== "test",
+    logger: env.NODE_ENV === "test" ? false : logger,
     bodyLimit: env.UPLOAD_BODY_LIMIT_MB * 1024 * 1024,
   });
 

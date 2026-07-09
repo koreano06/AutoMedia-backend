@@ -4,7 +4,10 @@ import { env } from "../../config/env.js";
 const prefix = "enc:v1:";
 
 function key() {
-  const source = env.ENCRYPTION_KEY || env.JWT_SECRET;
+  const source = env.ENCRYPTION_KEY || (env.NODE_ENV === "production" ? undefined : env.JWT_SECRET);
+  if (!source) {
+    throw new Error("ENCRYPTION_KEY precisa estar configurada para criptografar segredos fora do ambiente local.");
+  }
   return createHash("sha256").update(source).digest();
 }
 

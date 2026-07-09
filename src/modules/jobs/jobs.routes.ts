@@ -18,7 +18,7 @@ export async function registerJobsRoutes(app: FastifyInstance) {
     return jobsService.update(id, updateJobSchema.parse(request.body), request.user?.workspace_id);
   });
 
-  app.post("/:id/retry", async (request) => {
+  app.post("/:id/retry", { config: { rateLimit: { max: 6, timeWindow: "1 minute" } } }, async (request) => {
     const { id } = request.params as { id: string };
     return jobsService.retry(id, request.user?.workspace_id, request.user?.id);
   });

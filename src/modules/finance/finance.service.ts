@@ -2,6 +2,7 @@ import { prisma } from "../../database/prisma.js";
 import type { Expense, SalesOrder } from "../../shared/types/domain.js";
 import { expensesRepository, salesOrdersRepository } from "./finance.repository.js";
 import { auditService } from "../audit/audit.service.js";
+import { requireWorkspaceId } from "../../shared/utils/workspace.js";
 
 type SalesOrderPayload = Omit<Partial<SalesOrder>, "items"> & {
   items: Array<{
@@ -42,12 +43,13 @@ export const financeService = {
   },
 
   async createExpense(payload: Partial<Expense>, actorId?: string, workspaceId?: string) {
-    const expense = await expensesRepository.create({ workspace_id: workspaceId, ...payload });
+    const expense = await expensesRepository.create({ workspace_id: requireWorkspaceId(workspaceId), ...payload });
     await auditService.log({ actor_id: actorId, action: "finance.expense.create", entity_type: "expense", entity_id: expense.id, after: expense });
     return expense;
   },
 
   async createOrder(payload: SalesOrderPayload, actorId?: string, workspaceId?: string) {
+    const requiredWorkspaceId = requireWorkspaceId(workspaceId);
     const items = payload.items || [];
     const subtotal = items.reduce((sum, item) => sum + asNumber(item.unit_price) * item.quantity, 0);
     const costTotal = items.reduce((sum, item) => sum + asNumber(item.unit_cost) * item.quantity, 0);
@@ -59,7 +61,7 @@ export const financeService = {
     const order = await prisma.salesOrder.create({
       data: {
         customerName: payload.customer_name,
-        workspaceId,
+        workspaceId: requiredWorkspaceId,
         customerEmail: payload.customer_email,
         platform: payload.platform,
         status: payload.status || "paid",

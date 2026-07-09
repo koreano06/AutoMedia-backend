@@ -1,13 +1,9 @@
 import type { PlatformAccount } from "../../shared/types/domain.js";
 import { prisma } from "../../database/prisma.js";
 import { decryptSecret, encryptSecret } from "../../shared/utils/crypto.js";
+import { requireWorkspaceId } from "../../shared/utils/workspace.js";
 
 const seedPlatforms = ["instagram", "tiktok", "facebook", "youtube", "shopee", "mercadolivre"];
-const defaultWorkspaceId = "workspace_automedia";
-
-function resolveWorkspaceId(workspaceId?: string) {
-  return workspaceId || defaultWorkspaceId;
-}
 
 function toDomain(account: {
   id: string;
@@ -58,19 +54,19 @@ function toPrismaPayload(payload: Partial<PlatformAccount>) {
   };
 }
 
-async function seedDatabaseAccounts() {
+async function seedDatabaseAccounts(workspaceId: string) {
   await prisma.workspace.upsert({
-    where: { id: defaultWorkspaceId },
+    where: { id: workspaceId },
     update: {},
-    create: { id: defaultWorkspaceId, name: "AutoMedia", slug: "automedia" },
+    create: { id: workspaceId, name: "AutoMedia", slug: workspaceId === "workspace_automedia" ? "automedia" : workspaceId },
   });
 
   await Promise.all(seedPlatforms.map((platform) =>
     prisma.platformAccount.upsert({
-      where: { workspaceId_platform: { workspaceId: defaultWorkspaceId, platform } },
+      where: { workspaceId_platform: { workspaceId, platform } },
       update: {},
       create: {
-        workspaceId: defaultWorkspaceId,
+        workspaceId,
         platform,
         accountName: platform === "mercadolivre" ? "Mercado Livre" : platform.charAt(0).toUpperCase() + platform.slice(1),
         status: "disconnected",
@@ -81,23 +77,26 @@ async function seedDatabaseAccounts() {
 
 export const platformsRepository = {
   async listAccounts(workspaceId?: string) {
-    await seedDatabaseAccounts();
+    const resolvedWorkspaceId = requireWorkspaceId(workspaceId);
+    await seedDatabaseAccounts(resolvedWorkspaceId);
     const accounts = await prisma.platformAccount.findMany({
-      where: { workspaceId: resolveWorkspaceId(workspaceId) },
+      where: { workspaceId: resolvedWorkspaceId },
       orderBy: { platform: "asc" },
     });
     return accounts.map(toDomain);
   },
 
   async findByPlatform(platform: string, workspaceId?: string) {
-    await seedDatabaseAccounts();
-    const account = await prisma.platformAccount.findUnique({ where: { workspaceId_platform: { workspaceId: resolveWorkspaceId(workspaceId), platform } } });
+    const resolvedWorkspaceId = requireWorkspaceId(workspaceId);
+    await seedDatabaseAccounts(resolvedWorkspaceId);
+    const account = await prisma.platformAccount.findUnique({ where: { workspaceId_platform: { workspaceId: resolvedWorkspaceId, platform } } });
     return account ? toDomain(account) : null;
   },
 
   async updateStatus(platform: string, status: "connected" | "expired" | "error" | "disconnected", workspaceId?: string) {
+    const resolvedWorkspaceId = requireWorkspaceId(workspaceId);
     const updated = await prisma.platformAccount.update({
-      where: { workspaceId_platform: { workspaceId: resolveWorkspaceId(workspaceId), platform } },
+      where: { workspaceId_platform: { workspaceId: resolvedWorkspaceId, platform } },
       data: { status, lastSyncAt: new Date() },
     });
     return toDomain(updated);
@@ -105,7 +104,7 @@ export const platformsRepository = {
 
   async updateAccount(platform: string, payload: Partial<PlatformAccount>) {
     const data = toPrismaPayload(payload);
-    const workspaceId = resolveWorkspaceId(payload.workspace_id);
+    const workspaceId = requireWorkspaceId(payload.workspace_id);
     const updated = await prisma.platformAccount.upsert({
       where: { workspaceId_platform: { workspaceId, platform } },
       update: {

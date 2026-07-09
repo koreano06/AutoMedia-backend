@@ -28,6 +28,14 @@ if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
   warnings.push("JWT_SECRET tem menos de 32 caracteres. Use um segredo maior em producao.");
 }
 
+if (process.env.ENCRYPTION_KEY && process.env.ENCRYPTION_KEY.length < 32) {
+  warnings.push("ENCRYPTION_KEY tem menos de 32 caracteres. Use uma chave maior em producao.");
+}
+
+if (process.env.JWT_SECRET === "change-me-in-production") {
+  missing.push("JWT_SECRET ainda usa o valor padrao inseguro");
+}
+
 if (process.env.DATABASE_URL?.includes("localhost")) {
   warnings.push("DATABASE_URL aponta para localhost.");
 }
@@ -46,6 +54,10 @@ if (process.env.CORS_ORIGIN?.split(",").map((origin) => origin.trim()).includes(
 
 if (process.env.FRONTEND_URL && process.env.CORS_ORIGIN && !process.env.CORS_ORIGIN.includes(process.env.FRONTEND_URL)) {
   warnings.push("FRONTEND_URL nao aparece dentro de CORS_ORIGIN.");
+}
+
+if (process.env.API_PUBLIC_URL?.startsWith("http://")) {
+  warnings.push("API_PUBLIC_URL esta em HTTP. Para producao publica profissional, prefira HTTPS.");
 }
 
 if (process.env.STORAGE_DRIVER === "supabase") {

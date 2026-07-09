@@ -51,6 +51,10 @@ curl http://localhost:3333/api/health
 
 - Nunca commite `.env.local`.
 - Nunca cole `.env.local` inteiro em issue, chat ou README.
+- `JWT_SECRET` e `ENCRYPTION_KEY` devem ter pelo menos 32 caracteres em ambientes reais.
+- `ENCRYPTION_KEY` deve ser independente do `JWT_SECRET`.
+- Para integracoes OAuth, use `API_PUBLIC_URL` estavel e preferencialmente HTTPS.
+- URLs remotas de mídia e callback devem usar HTTPS quando o backend estiver exposto publicamente.
 - Quando precisar mostrar configuração, use:
 
 ```bash
@@ -64,7 +68,7 @@ Esse comando mascara valores sensíveis.
 No frontend local, use:
 
 ```env
-VITE_API_BASE_URL=http://192.168.1.42:3333/api
+VITE_API_BASE_URL=http://IP_DA_VM:3333/api
 ```
 
 No frontend da Vercel, use uma URL pública/tunnel/HTTPS quando a API precisar funcionar fora da sua rede.

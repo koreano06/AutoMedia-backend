@@ -3,6 +3,7 @@ import { env } from "../../config/env.js";
 import { getQueueConnection } from "../../queue/queue.client.js";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { requireWorkspaceId } from "../../shared/utils/workspace.js";
 
 type DiagnosticUser = {
   id: string;
@@ -193,9 +194,10 @@ async function runAuthCheck(user?: DiagnosticUser) {
 
 async function runDatabaseWriteCheck(user?: DiagnosticUser) {
   return timedCheck("database_write", "Escrita segura no banco", async () => {
+    const workspaceId = requireWorkspaceId(user?.workspace_id);
     const job = await prisma.job.create({
       data: {
-        workspaceId: user?.workspace_id,
+        workspaceId,
         type: "diagnostic_check",
         title: "Diagnóstico temporário",
         status: "queued",
@@ -218,7 +220,7 @@ async function runDatabaseWriteCheck(user?: DiagnosticUser) {
     return {
       status: "ok",
       message: "Create, update e delete temporários executados com sucesso.",
-      metadata: { workspace_id: user?.workspace_id || null },
+      metadata: { workspace_id: workspaceId },
     };
   });
 }

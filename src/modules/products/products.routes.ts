@@ -15,7 +15,7 @@ export async function registerProductsRoutes(app: FastifyInstance) {
     return created(reply, await productsService.create(payload, request.user?.id, request.user?.workspace_id));
   });
 
-  app.post("/analyze", async (request, reply) => {
+  app.post("/analyze", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
     const payload = productAnalyzeSchema.parse(request.body);
     return accepted(reply, await productsService.analyze(payload, request.user?.id, request.user?.workspace_id));
   });
